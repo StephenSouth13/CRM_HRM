@@ -244,7 +244,7 @@ export async function registerAction(
  */
 export async function logoutAction() {
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = await createSupabaseServerClient()
     await supabase.auth.signOut()
 
     return {
