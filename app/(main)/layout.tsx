@@ -10,7 +10,7 @@ import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar'
 
 export default async function MainLayout({ children }: { children: React.ReactNode }) {
   // LƯU Ý: Đây là Server Component (Không dùng use client)
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
