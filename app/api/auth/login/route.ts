@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
   }
 
   // 4. XÁC THỰC BẰNG SUPABASE AUTH (Dùng client quản lý cookies)
-  const supabase = createSupabaseServerClient(); 
+  const supabase = await createSupabaseServerClient(); 
   
   const { data: authData, error: authError } =
     await supabase.auth.signInWithPassword({ email, password });
