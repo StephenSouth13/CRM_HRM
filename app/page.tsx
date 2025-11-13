@@ -5,7 +5,7 @@ import { redirect } from "next/navigation"
 import { createSupabaseServerClient } from '@/lib/supabase/server'; // Import từ file vừa tạo
 
 export default async function HomePage() {
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   
   // 1. Nếu đã đăng nhập, chuyển thẳng đến /dashboard
