@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -33,7 +33,7 @@ interface SalaryData {
   profiles: {
     first_name: string;
     last_name: string;
-  };
+  } | null; // Cần thêm | null vì join có thể trả về null
 }
 
 interface MonthlyTrend {
@@ -57,11 +57,8 @@ const SalaryStatistics = () => {
   const [employeeComparisons, setEmployeeComparisons] = useState<EmployeeComparison[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState("6");
 
-  useEffect(() => {
-    fetchSalaryData();
-  }, [selectedPeriod]);
-
-  const fetchSalaryData = async () => {
+  // Đóng gói hàm tải dữ liệu bằng useCallback để tránh lỗi dependency
+  const fetchSalaryData = useCallback(async () => {
     try {
       setLoading(true);
       const monthsToFetch = parseInt(selectedPeriod);
@@ -88,15 +85,23 @@ const SalaryStatistics = () => {
 
       if (error) throw error;
 
-      setSalaryData(data as any || []);
-      processMonthlyTrends(data as any || []);
-      processEmployeeComparisons(data as any || []);
+      // Sửa lỗi: Ép kiểu dữ liệu an toàn hơn, không dùng 'as any'
+      const fetchedData = (data || []) as SalaryData[];
+      
+      setSalaryData(fetchedData);
+      processMonthlyTrends(fetchedData);
+      processEmployeeComparisons(fetchedData);
     } catch (error) {
-      console.error("Error fetching salary data:", error);
+      console.error("Lỗi tải dữ liệu lương:", error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedPeriod]); // Dependency đã được thêm
+
+  // Cập nhật useEffect: Thêm fetchSalaryData vào mảng dependency
+  useEffect(() => {
+    fetchSalaryData();
+  }, [selectedPeriod, fetchSalaryData]);
 
   const processMonthlyTrends = (data: SalaryData[]) => {
     const monthlyMap = new Map<string, { total: number; count: number; bonus: number }>();
@@ -135,7 +140,8 @@ const SalaryStatistics = () => {
 
     const comparisons = Array.from(employeeMap.values())
       .map((record) => ({
-        name: `${record.profiles?.first_name} ${record.profiles?.last_name}`,
+        // Sửa lỗi: Kiểm tra null cho profiles
+        name: `${record.profiles?.first_name || 'N/A'} ${record.profiles?.last_name || ''}`,
         salary: Number(record.base_salary || 0),
         bonus: Number(record.bonus || 0),
         total: Number(record.total_salary || 0),
