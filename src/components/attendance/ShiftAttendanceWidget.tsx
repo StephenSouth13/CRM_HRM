@@ -13,13 +13,15 @@ type ShiftType = 'morning' | 'afternoon' | 'overtime';
 
 interface ShiftRecord {
   id: string;
+  user_id: string;
+  type: 'check_in' | 'check_out';
+  timestamp: string;
   shift_type: ShiftType;
-  check_in: string | null;
-  check_out: string | null;
-  date: string;
-  status: 'pending' | 'checked_in' | 'completed' | 'absent';
+  status?: 'pending' | 'checked_in' | 'completed' | 'absent';
   location: string | null;
   notes: string | null;
+  is_leave?: boolean;
+  leave_type?: 'annual' | 'sick' | 'unpaid' | null;
 }
 
 interface ShiftStats {
@@ -197,7 +199,7 @@ const ShiftAttendanceWidget = () => {
 
       toast({
         title: "Chấm công thành công",
-        description: `Đã chấm c��ng ${SHIFT_TIMES[shiftType].label} lúc ${format(new Date(), 'HH:mm')}`,
+        description: `Đã chấm công ${SHIFT_TIMES[shiftType].label} lúc ${format(new Date(), 'HH:mm')}`,
       });
 
       await loadTodayAttendance(userId);
