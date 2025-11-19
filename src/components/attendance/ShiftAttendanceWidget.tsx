@@ -273,7 +273,7 @@ const ShiftAttendanceWidget = () => {
       return { status: 'Vắng mặt', color: 'bg-red-100 text-red-700', icon: XCircle };
     }
 
-    return { status: 'Chờ xử l��', color: 'bg-yellow-100 text-yellow-700', icon: Clock };
+    return { status: 'Chờ xử lý', color: 'bg-yellow-100 text-yellow-700', icon: Clock };
   };
 
   const renderShiftCard = (shiftType: ShiftType) => {
@@ -285,21 +285,21 @@ const ShiftAttendanceWidget = () => {
 
     return (
       <Card key={shiftType} className="overflow-hidden hover:shadow-medium transition-shadow">
-        <CardContent className="p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="font-heading font-semibold text-lg">{shiftInfo.label}</h4>
-              <p className="text-sm text-muted-foreground">
+        <CardContent className="p-3 md:p-4 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <h4 className="font-heading font-semibold text-base md:text-lg">{shiftInfo.label}</h4>
+              <p className="text-xs md:text-sm text-muted-foreground">
                 {shiftInfo.start} - {shiftInfo.end}
               </p>
             </div>
-            <Badge className={`${color} border-0 text-xs`}>
+            <Badge className={`${color} border-0 text-xs flex-shrink-0`}>
               {statusText}
             </Badge>
           </div>
 
           {record && (
-            <div className="text-sm space-y-1 bg-muted/50 rounded p-2">
+            <div className="text-xs md:text-sm space-y-1 bg-muted/50 rounded p-2">
               {record.check_in && (
                 <p className="text-foreground">
                   <span className="font-medium">Vào:</span> {format(new Date(record.check_in), 'HH:mm')}
@@ -316,22 +316,24 @@ const ShiftAttendanceWidget = () => {
           <div className="flex gap-2 pt-2">
             <Button
               size="sm"
-              className="flex-1"
+              className="flex-1 text-xs md:text-sm h-9 md:h-10"
               disabled={isCompleted || isLoading}
               onClick={() => handleShiftCheckIn(shiftType)}
             >
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
-              Vào
+              {isLoading ? <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" /> : <CheckCircle2 className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />}
+              <span className="hidden sm:inline">Vào</span>
+              <span className="sm:hidden">Vào</span>
             </Button>
             <Button
               size="sm"
               variant="outline"
-              className="flex-1"
+              className="flex-1 text-xs md:text-sm h-9 md:h-10"
               disabled={!isCheckedIn || isCompleted || isLoading}
               onClick={() => handleShiftCheckOut(shiftType)}
             >
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4 mr-2" />}
-              Ra
+              {isLoading ? <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" /> : <XCircle className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />}
+              <span className="hidden sm:inline">Ra</span>
+              <span className="sm:hidden">Ra</span>
             </Button>
           </div>
         </CardContent>
