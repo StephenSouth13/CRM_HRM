@@ -282,10 +282,24 @@ const ShiftAttendanceWidget = () => {
 
   const renderShiftCard = (shiftType: ShiftType) => {
     const shiftInfo = SHIFT_TIMES[shiftType];
-    const record = todayRecords.find(r => r.shift_type === shiftType);
-    const { status: statusText, color, icon: StatusIcon } = getShiftStatus(record);
-    const isCheckedIn = record?.status === 'checked_in' || record?.status === 'completed';
-    const isCompleted = record?.status === 'completed';
+    const shiftRecords = todayRecords.filter(r => r.shift_type === shiftType);
+    const hasCheckIn = shiftRecords.some(r => r.type === 'check_in');
+    const hasCheckOut = shiftRecords.some(r => r.type === 'check_out');
+    const checkInRecord = shiftRecords.find(r => r.type === 'check_in');
+    const checkOutRecord = shiftRecords.find(r => r.type === 'check_out');
+
+    let statusText = 'Chưa chấm';
+    let color = 'bg-gray-100 text-gray-700';
+
+    if (hasCheckIn && hasCheckOut) {
+      statusText = 'Hoàn thành';
+      color = 'bg-green-100 text-green-700';
+    } else if (hasCheckIn && !hasCheckOut) {
+      statusText = 'Đang làm';
+      color = 'bg-blue-100 text-blue-700';
+    }
+
+    const isCompleted = hasCheckIn && hasCheckOut;
 
     return (
       <Card key={shiftType} className="overflow-hidden hover:shadow-medium transition-shadow">
