@@ -76,8 +76,7 @@ const Login = () => {
 
         try {
             const { error } = await signUp(signupEmail, signupPassword, {
-                first_name: signupFirstName,
-                last_name: signupLastName
+                full_name: `${signupFirstName} ${signupLastName}`
             });
             
             if (error) {
