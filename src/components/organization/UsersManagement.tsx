@@ -513,6 +513,7 @@ const UsersManagement = () => {
                                 <TableRow>
                                     <TableHead className="w-[250px] text-primary">Họ Tên & Email</TableHead>
                                     <TableHead className="w-[120px]">Vai trò</TableHead>
+                                    <TableHead className="w-[140px]">Trạng thái TK</TableHead>
                                     <TableHead className="w-[150px]">Tình trạng</TableHead>
                                     <TableHead className="w-[150px]">Đội nhóm</TableHead>
                                     <TableHead className="w-[150px]">Nghỉ phép (Ngày)</TableHead>
