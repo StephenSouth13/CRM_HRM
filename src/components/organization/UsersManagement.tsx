@@ -3,13 +3,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Plus, Loader2, Users, ChevronDown, ChevronUp, FileText, GraduationCap, Briefcase, Calendar, Search } from "lucide-react";
+import { Plus, Loader2, Users, ChevronDown, ChevronUp, FileText, GraduationCap, Briefcase, Calendar, Search, Check, X } from "lucide-react";
 import { format } from "date-fns";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast"; 
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"; 
-import { Input } from "@/components/ui/input"; // Thêm Input
+import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 
 // --- INTERFACES CHÍNH XÁC ---
@@ -21,9 +23,9 @@ interface UserDetail {
     id: string; first_name: string | null; last_name: string | null; email: string; avatar_url: string | null;
     annual_leave_balance: number; phone: string | null; date_of_birth: string | null;
     gender: string | null; employment_status: string | null; university: string | null;
-    major: string | null; cv_url: string | null;
-    team_id: string | null; shift_id: string | null; 
-    team: TeamInfo | null; shift: ShiftInfo | null; user_roles: UserRoleData[] | null; 
+    major: string | null; cv_url: string | null; account_status: string | null;
+    team_id: string | null; shift_id: string | null;
+    team: TeamInfo | null; shift: ShiftInfo | null; user_roles: UserRoleData[] | null;
 }
 // --- END INTERFACES ---
 
