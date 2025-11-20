@@ -182,8 +182,7 @@ SELECT
   json_agg(
     json_build_object(
       'id', tl.user_id,
-      'first_name', p.first_name,
-      'last_name', p.last_name,
+      'full_name', p.full_name,
       'email', p.email,
       'avatar_url', p.avatar_url
     )
@@ -198,22 +197,21 @@ CREATE OR REPLACE VIEW public.attendance_with_leave AS
 SELECT
   a.*,
   p.email AS user_email,
-  (CONCAT_WS(' ', p.last_name, p.first_name))::TEXT AS user_name,
+  p.full_name AS user_name,
   lr.id AS leave_request_id,
   lr.leave_type AS leave_request_type
 FROM public.attendance a
 LEFT JOIN public.profiles p ON a.user_id = p.id
-LEFT JOIN public.leave_requests lr ON 
-  a.user_id = lr.user_id 
-  AND DATE(a.timestamp) >= lr.start_date 
+LEFT JOIN public.leave_requests lr ON
+  a.user_id = lr.user_id
+  AND DATE(a.timestamp) >= lr.start_date
   AND DATE(a.timestamp) <= lr.end_date;
 
 -- View: user_salary_overview (current month salary details)
 CREATE OR REPLACE VIEW public.user_salary_overview AS
 SELECT
   p.id,
-  p.first_name,
-  p.last_name,
+  p.full_name,
   p.email,
   s.base_salary,
   s.allowances,
