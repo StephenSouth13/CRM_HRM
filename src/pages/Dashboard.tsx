@@ -54,8 +54,21 @@ const Dashboard = () => {
             const pendingTasks = totalTasks - completedTasks;
 
             // Kiểm tra điểm danh hôm nay
-            const today = format(new Date(), 'yyyy-MM-dd');
-            const { data: attendance } = await supabase.from('attendance').select('*').eq('user_id', userId).eq('date', today).limit(1);
+            const today = new Date();
+            const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+
+            const { data: attendance, error: attendanceError } = await supabase
+              .from('attendance')
+              .select('*')
+              .eq('user_id', userId)
+              .gte('timestamp', startOfDay.toISOString())
+              .lt('timestamp', endOfDay.toISOString())
+              .limit(1);
+
+            if (attendanceError) {
+              console.error("Lỗi tải điểm danh:", attendanceError.message);
+            }
 
             // Load số ngày phép
             const { data: profile } = await supabase.from('profiles').select('annual_leave_balance').eq('id', userId).single();
@@ -70,8 +83,8 @@ const Dashboard = () => {
                 leaveBalance: (profile as BasicProfile)?.annual_leave_balance || 0, 
                 upcomingMeetings: meetings?.length || 0,
             });
-        } catch (error) {
-            console.error("Lỗi tải stats nhân viên:", error);
+        } catch (error: any) {
+            console.error("Lỗi tải stats nhân viên:", error?.message || error);
         }
     }, []);
 
@@ -97,8 +110,8 @@ const Dashboard = () => {
                 totalEmployees,
                 pendingApprovals,
             }));
-        } catch (error) {
-            console.error("Lỗi tải stats Admin:", error);
+        } catch (error: any) {
+            console.error("Lỗi tải stats Admin:", error?.message || error);
         }
     }, []);
 
@@ -123,8 +136,8 @@ const Dashboard = () => {
                 } else if (userRole === 'leader' || userRole === 'admin' || userRole === 'bod') {
                     await loadAdminStats();
                 }
-            } catch (error) {
-                console.error("Lỗi tải dashboard:", error);
+            } catch (error: any) {
+                console.error("Lỗi tải dashboard:", error?.message || error);
             } finally {
                 setLoading(false);
             }

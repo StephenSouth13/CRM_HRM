@@ -7,11 +7,35 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { signIn, signUp, getCurrentUser } from "@/lib/auth";
-import { Loader2 } from "lucide-react"; 
+import { Loader2 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 // --- Custom Constants ---
 const APP_NAME = "MSC Center - HRM AI";
 const LOGO_PATH = "/LOGO.PNG"; // Đường dẫn đến logo tổ chức
+
+const ROLES = [
+  { value: "staff", label: "Nhân Viên" },
+  { value: "it", label: "IT" },
+  { value: "hr", label: "HR" },
+  { value: "design", label: "Design" },
+  { value: "content", label: "Content" },
+];
+
+const DEPARTMENTS = [
+  { value: "it", label: "Công Nghệ Thông Tin" },
+  { value: "hr", label: "Nhân Sự" },
+  { value: "sales", label: "Bán Hàng" },
+  { value: "marketing", label: "Marketing" },
+  { value: "design", label: "Thiết Kế" },
+  { value: "content", label: "Nội Dung" },
+];
 
 const Login = () => {
     const navigate = useNavigate();
@@ -21,8 +45,11 @@ const Login = () => {
     const [loginPassword, setLoginPassword] = useState("");
     const [signupEmail, setSignupEmail] = useState("");
     const [signupPassword, setSignupPassword] = useState("");
+    const [signupPhone, setSignupPhone] = useState("");
     const [signupFirstName, setSignupFirstName] = useState("");
     const [signupLastName, setSignupLastName] = useState("");
+    const [signupRole, setSignupRole] = useState("");
+    const [signupDepartment, setSignupDepartment] = useState("");
 
     // --- Logic: Kiểm tra Auth và Redirect ---
     useEffect(() => {
@@ -46,7 +73,7 @@ const Login = () => {
             if (error) {
                 toast({
                     variant: "destructive",
-                    title: "Đăng nhập Thất bại",
+                    title: "Đăng nhập Th��t bại",
                     description: error.message
                 });
                 return;
@@ -72,13 +99,33 @@ const Login = () => {
     // --- Xử lý Đăng ký ---
     const handleSignup = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!signupRole) {
+            toast({
+                variant: "destructive",
+                title: "Lỗi",
+                description: "Vui lòng chọn vị trí công việc"
+            });
+            return;
+        }
+
+        if (!signupDepartment) {
+            toast({
+                variant: "destructive",
+                title: "Lỗi",
+                description: "Vui lòng chọn phòng ban"
+            });
+            return;
+        }
+
         setIsLoading(true);
 
         try {
             const { error } = await signUp(signupEmail, signupPassword, {
-                full_name: `${signupFirstName} ${signupLastName}`
+                first_name: signupFirstName,
+                last_name: signupLastName
             });
-            
+
             if (error) {
                 toast({
                     variant: "destructive",
@@ -90,9 +137,17 @@ const Login = () => {
 
             toast({
                 title: "Tạo tài khoản Thành công!",
-                description: "Tài khoản của bạn đã được tạo và đang chờ phê duyệt từ Admin."
+                description: "Tài khoản của bạn đã được tạo và đang chờ phê duyệt từ Admin/HR."
             });
-            // Giữ nguyên ở trang này, chờ người dùng đọc thông báo
+
+            // Reset form
+            setSignupEmail("");
+            setSignupPassword("");
+            setSignupPhone("");
+            setSignupFirstName("");
+            setSignupLastName("");
+            setSignupRole("");
+            setSignupDepartment("");
         } catch (error: any) {
             toast({
                 variant: "destructive",
@@ -194,8 +249,8 @@ const Login = () => {
                         {/* --- TAB CONTENT: ĐĂNG KÝ --- */}
                         <TabsContent value="signup">
                             <form onSubmit={handleSignup}>
-                                <CardContent className="space-y-6 pt-6">
-                                    
+                                <CardContent className="space-y-5 pt-6 max-h-[500px] overflow-y-auto">
+
                                     <div className="grid grid-cols-2 gap-4">
                                         {/* First Name */}
                                         <div className="space-y-2">
@@ -203,7 +258,7 @@ const Login = () => {
                                             <Input
                                                 id="signup-firstname"
                                                 type="text"
-                                                placeholder=""
+                                                placeholder="Nguyễn"
                                                 value={signupFirstName}
                                                 onChange={(e) => setSignupFirstName(e.target.value)}
                                                 required
@@ -216,7 +271,7 @@ const Login = () => {
                                             <Input
                                                 id="signup-lastname"
                                                 type="text"
-                                                placeholder=""
+                                                placeholder="Văn A"
                                                 value={signupLastName}
                                                 onChange={(e) => setSignupLastName(e.target.value)}
                                                 required
@@ -224,47 +279,82 @@ const Login = () => {
                                             />
                                         </div>
                                     </div>
+
                                     <div className="space-y-2">
-                                        <Label htmlFor="signup-email">Số điện thoại</Label>
+                                        <Label htmlFor="signup-phone">Số điện thoại</Label>
                                         <Input
-                                            id="numberID"
-                                            type="number"
-                                            placeholder=""
-                                            value={signupEmail}
-                                            onChange={(e) => setSignupEmail(e.target.value)}
-                                            required
+                                            id="signup-phone"
+                                            type="tel"
+                                            placeholder="0901234567"
+                                            value={signupPhone}
+                                            onChange={(e) => setSignupPhone(e.target.value)}
                                             disabled={isLoading}
                                         />
                                     </div>
+
                                     <div className="space-y-2">
                                         <Label htmlFor="signup-email">Email</Label>
                                         <Input
                                             id="signup-email"
                                             type="email"
-                                            placeholder=""
+                                            placeholder="email@company.com"
                                             value={signupEmail}
                                             onChange={(e) => setSignupEmail(e.target.value)}
                                             required
                                             disabled={isLoading}
                                         />
                                     </div>
-                                    
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="signup-role">Vị Trí Công Việc</Label>
+                                            <Select value={signupRole} onValueChange={setSignupRole} disabled={isLoading}>
+                                                <SelectTrigger id="signup-role">
+                                                    <SelectValue placeholder="Chọn vị trí" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {ROLES.map(role => (
+                                                        <SelectItem key={role.value} value={role.value}>
+                                                            {role.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="signup-department">Phòng Ban</Label>
+                                            <Select value={signupDepartment} onValueChange={setSignupDepartment} disabled={isLoading}>
+                                                <SelectTrigger id="signup-department">
+                                                    <SelectValue placeholder="Chọn phòng ban" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {DEPARTMENTS.map(dept => (
+                                                        <SelectItem key={dept.value} value={dept.value}>
+                                                            {dept.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+
                                     <div className="space-y-2">
                                         <Label htmlFor="signup-password">Mật khẩu</Label>
                                         <Input
                                             id="signup-password"
                                             type="password"
-                                            placeholder=""
+                                            placeholder="••••••"
                                             value={signupPassword}
                                             onChange={(e) => setSignupPassword(e.target.value)}
                                             required
                                             disabled={isLoading}
                                             minLength={6}
                                         />
-                                        <p className="text-xs text-muted-foreground pt-1">Mật khẩu tối thiểu 6 ký tự.</p>
+                                        <p className="text-xs text-muted-foreground pt-1">Tối thiểu 6 ký tự.</p>
                                     </div>
                                 </CardContent>
-                                
+
                                 <CardFooter>
                                     <Button type="submit" className="w-full h-10 text-base gradient-primary shadow-lg shadow-primary/30" disabled={isLoading}>
                                         {isLoading ? (

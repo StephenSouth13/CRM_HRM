@@ -74,3 +74,56 @@ export const signOut = async () => {
   const { error } = await supabase.auth.signOut();
   return { error };
 };
+
+export const resetPasswordRequest = async (email: string) => {
+  const redirectUrl = `${window.location.origin}/auth/reset-password`;
+
+  const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: redirectUrl
+  });
+  return { data, error };
+};
+
+export const updatePassword = async (newPassword: string) => {
+  const { data, error } = await supabase.auth.updateUser({
+    password: newPassword
+  });
+  return { data, error };
+};
+
+export const verifyOtp = async (email: string, token: string, type: 'recovery' | 'email_change' | 'phone_change' = 'recovery') => {
+  const { data, error } = await supabase.auth.verifyOtp({
+    email,
+    token,
+    type
+  });
+  return { data, error };
+};
+
+export const getPendingRegistrations = async () => {
+  const { data, error } = await supabase
+    .from('user_registrations')
+    .select('*')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+
+  return { data, error };
+};
+
+export const approveRegistration = async (registrationId: string, role: string) => {
+  const { data, error } = await supabase
+    .from('user_registrations')
+    .update({ status: 'approved', assigned_role: role, approved_at: new Date().toISOString() })
+    .eq('id', registrationId);
+
+  return { data, error };
+};
+
+export const rejectRegistration = async (registrationId: string, reason: string) => {
+  const { data, error } = await supabase
+    .from('user_registrations')
+    .update({ status: 'rejected', rejection_reason: reason })
+    .eq('id', registrationId);
+
+  return { data, error };
+};
