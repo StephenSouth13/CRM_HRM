@@ -5,9 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { signIn, signUp, getCurrentUser } from "@/lib/auth";
-import { Loader2 } from "lucide-react"; 
+import { signIn, signUp, getCurrentUser, createUserRegistration } from "@/lib/auth";
+import { Loader2, Upload } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client"; 
 
 // --- Custom Constants ---
 const APP_NAME = "MSC Center - HRM AI";
