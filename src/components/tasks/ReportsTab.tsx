@@ -66,17 +66,23 @@ const ReportsTab = ({ role }: { role: UserRole }) => {
   const loadData = async () => {
     try {
       const user = await getCurrentUser();
-      if (!user) return;
+      if (!user) {
+        setLoading(false);
+        return;
+      }
 
       // Load daily reports
       let reportsQuery = supabase.from('daily_reports').select('*');
-      
+
       if (role !== 'admin' && role !== 'hr') {
         reportsQuery = reportsQuery.eq('user_id', user.id);
       }
 
       const { data: reportsData, error: reportsError } = await reportsQuery.order('report_date', { ascending: false });
-      if (reportsError) throw reportsError;
+      if (reportsError) {
+        console.error('Reports query error:', reportsError);
+        throw new Error(reportsError.message || 'Failed to load reports');
+      }
       setReports(reportsData || []);
 
       // Load meeting minutes
@@ -84,8 +90,11 @@ const ReportsTab = ({ role }: { role: UserRole }) => {
         .from('meeting_minutes')
         .select('*')
         .order('meeting_date', { ascending: false });
-      
-      if (meetingsError) throw meetingsError;
+
+      if (meetingsError) {
+        console.error('Meetings query error:', meetingsError);
+        throw new Error(meetingsError.message || 'Failed to load meetings');
+      }
       setMeetings(meetingsData || []);
 
     } catch (error) {
@@ -95,11 +104,11 @@ const ReportsTab = ({ role }: { role: UserRole }) => {
         errorMessage = error.message;
       } else if (typeof error === 'string') {
         errorMessage = error;
-      } else if (error && typeof error === 'object' && 'message' in error) {
-        errorMessage = String((error as any).message);
+      } else if (error && typeof error === 'object') {
+        errorMessage = JSON.stringify(error);
       }
 
-      console.error('Error loading reports:', error, errorMessage);
+      console.error('Error loading reports:', error);
       toast({
         title: "Lỗi tải báo cáo",
         description: errorMessage,
