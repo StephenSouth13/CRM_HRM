@@ -210,9 +210,64 @@ CREATE TRIGGER recalc_daily_on_session_change AFTER INSERT OR UPDATE ON public.a
     FOR EACH ROW EXECUTE FUNCTION calculate_daily_attendance();
 
 -- ============================================================================
--- 10. GRANT PERMISSIONS
+-- 10. CREATE AUTO-CHECKOUT FUNCTION
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION public.auto_checkout_unclosed_sessions(max_hours_limit NUMERIC DEFAULT 14)
+RETURNS jsonb AS $$
+DECLARE
+    v_count INT := 0;
+    v_session RECORD;
+    v_checkout_time TIMESTAMP WITH TIME ZONE;
+    v_hours NUMERIC;
+    v_settings RECORD;
+BEGIN
+    -- Get global settings or use defaults
+    SELECT auto_checkout_time, max_hours_per_day
+    INTO v_settings
+    FROM public.attendance_settings
+    WHERE team_id IS NULL
+    LIMIT 1;
+
+    IF v_settings IS NULL THEN
+        v_settings := ROW('23:59:00'::TIME, max_hours_limit);
+    END IF;
+
+    -- Find all unclosed sessions from yesterday or earlier
+    FOR v_session IN
+        SELECT id, check_in, session_date
+        FROM public.attendance_sessions
+        WHERE check_out IS NULL
+        AND session_date < CURRENT_DATE
+        ORDER BY session_date, check_in
+    LOOP
+        -- Set checkout time to the auto-checkout time configured
+        v_checkout_time := (v_session.session_date || ' ' || COALESCE(v_settings.auto_checkout_time, '23:59:00'))::TIMESTAMP WITH TIME ZONE;
+
+        -- Calculate hours
+        v_hours := EXTRACT(EPOCH FROM (v_checkout_time - v_session.check_in)) / 3600;
+
+        -- Only auto-checkout if hours are within limit
+        IF v_hours > 0 AND v_hours <= v_settings.max_hours_per_day THEN
+            UPDATE public.attendance_sessions
+            SET check_out = v_checkout_time,
+                is_auto_checkout = TRUE,
+                notes = COALESCE(notes, '') || ' [Auto-checkout do không bấm Ra]'
+            WHERE id = v_session.id;
+
+            v_count := v_count + 1;
+        END IF;
+    END LOOP;
+
+    RETURN jsonb_build_object('count', v_count, 'status', 'success');
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
+-- 11. GRANT PERMISSIONS
 -- ============================================================================
 
 GRANT SELECT, INSERT, UPDATE ON public.attendance_sessions TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.daily_attendance TO authenticated;
 GRANT SELECT ON public.attendance_settings TO authenticated;
+GRANT EXECUTE ON FUNCTION public.auto_checkout_unclosed_sessions TO authenticated;
