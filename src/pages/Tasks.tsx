@@ -158,11 +158,10 @@ const Tasks = () => {
           {/* ======= NHÓM QUẢN LÝ CÔNG VIỆC ======= */}
           <TabsContent value="board" className="mt-6">
             {teamId && userId && (
-              <EnhancedTaskBoard
+              <KanbanBoard
                 teamId={teamId}
                 userId={userId}
-                creatorData={creatorData}
-                assigneeData={assigneeData}
+                users={Object.values(creatorData)}
               />
             )}
           </TabsContent>
