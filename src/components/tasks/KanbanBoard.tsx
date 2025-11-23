@@ -48,7 +48,7 @@ const createClient = (url: string, key: string): any => {
             delete: () => ({ eq: async () => ({ error: null }) }),
         }),
         auth: {
-            // Giả lập người dùng đã đăng nhập để các logic tiếp theo có thể chạy
+            // Giả lập người dùng đã đăng nhập để các logic tiếp theo có thể ch���y
             getUser: async () => ({ data: { user: { id: 'mock-user-id-a1b2c3d4' } }, error: null }),
         },
         // Mock cho Real-time subscriptions
@@ -479,7 +479,7 @@ export const KanbanBoard = ({ teamId, userId, users }: KanbanBoardProps) => {
                                 </Button>
                                 <Button type="submit" disabled={isLoading}>
                                     {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                                    Tạo Cột
+                                    Tạo C���t
                                 </Button>
                             </DialogFooter>
                         </form>
@@ -769,7 +769,6 @@ const TaskCard = ({ task, users, onUpdate, onDelete }: TaskCardProps) => {
                                     <SelectValue placeholder="Chưa giao" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">Chưa giao</SelectItem>
                                     {users.map(user => (
                                         <SelectItem key={user.id} value={user.id}>
                                             {user.first_name} {user.last_name}
@@ -814,7 +813,7 @@ const TaskCard = ({ task, users, onUpdate, onDelete }: TaskCardProps) => {
                     <DialogHeader>
                         <DialogTitle>Xác nhận Xóa Công việc</DialogTitle>
                         <DialogDescription>
-                            Bạn có chắc chắn muốn xóa công việc "{task.title}" không? Hành động này không thể hoàn tác.
+                            Bạn có chắc chắn muốn xóa công việc "{task.title}" không? Hành đ��ng này không thể hoàn tác.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
