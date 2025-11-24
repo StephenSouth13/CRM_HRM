@@ -56,7 +56,8 @@ const AttendanceSettings = () => {
       }
 
     } catch (error) {
-      console.error('Lỗi tải đội nhóm:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Lỗi tải đội nhóm:', errorMessage);
       toast({ title: "Lỗi", description: "Không thể tải danh sách đội nhóm.", variant: "destructive" });
     } finally {
       setLoadingTeams(false);
