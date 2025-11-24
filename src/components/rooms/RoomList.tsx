@@ -24,7 +24,8 @@ const RoomList = ({ role }: { role: UserRole }) => {
       if (error) throw error;
       setRooms(data || []);
     } catch (error) {
-      console.error('Error fetching rooms:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Error fetching rooms:', errorMessage);
     } finally {
       setLoading(false);
     }
