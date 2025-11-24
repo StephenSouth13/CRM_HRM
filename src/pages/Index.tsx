@@ -1,35 +1,29 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-// Giả định component Button đã có sẵn
-import { Button } from "@/components/ui/button"; 
-// Đã loại bỏ import lỗi và thay bằng hàm mock
-// import { getCurrentUser } from "@/lib/auth"; 
+import { Button } from "@/components/ui/button";
+import { getCurrentUser, getUserProfile } from "@/lib/auth";
 
 // --- Custom Constants ---
 const APP_NAME = "LifeOS HRM AI";
-// Sử dụng /LOGO.PNG như đường dẫn, đảm bảo file này nằm trong thư mục public
-const LOGO_PATH = "/LOGO.PNG"; 
-
-// --- MOCK FUNCTION ---
-// Hàm giả lập (Mock function) để thay thế getCurrentUser() và cho phép code chạy.
-// Trong môi trường thực tế, bạn cần thay thế nó bằng hàm getCurrentUser() từ Supabase/Firebase.
-const getCurrentUser = async () => {
-  // Trả về null để trang Landing Page hiển thị bình thường
-  return null; 
-};
+const LOGO_PATH = "/LOGO.PNG";
 
 const Index = () => {
   const navigate = useNavigate();
 
-  // Logic Redirect: Chuyển hướng người dùng đã đăng nhập về Dashboard
-  // Giữ lại logic này để đảm bảo người dùng đã đăng nhập không bị kẹt ở trang landing
+  // Logic Redirect: Chuyển hướng người dùng dựa trên trạng thái tài khoản
   useEffect(() => {
     const checkAuth = async () => {
-      // Giả định getCurrentUser() là hàm bất đồng bộ
-      const user = await getCurrentUser(); 
+      const user = await getCurrentUser();
       if (user) {
-        // Chỉ chuyển hướng nếu có người dùng (user != null)
-        navigate("/dashboard");
+        // Check account status
+        const profile = await getUserProfile(user.id);
+        if (profile?.account_status === 'APPROVED') {
+          // User is approved, go to dashboard
+          navigate("/dashboard");
+        } else if (profile?.account_status === 'PENDING' || profile?.account_status === 'REJECTED') {
+          // User is pending or rejected, redirect to pending approval page
+          navigate("/auth/pending-approval");
+        }
       }
     };
     checkAuth();
