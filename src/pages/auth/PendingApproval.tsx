@@ -6,13 +6,15 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { getCurrentUser, getUserProfile, signOut } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
-import { Clock, Mail, AlertCircle, LogOut, RefreshCw } from "lucide-react";
+import { Clock, Mail, AlertCircle, LogOut, RefreshCw, CheckCircle2 } from "lucide-react";
 
 interface RegistrationStatus {
   status: 'pending' | 'approved' | 'rejected';
   created_at: string;
   rejection_reason?: string;
   reapplication_count?: number;
+  admin_approved_at?: string;
+  hr_approved_at?: string;
 }
 
 const PendingApproval = () => {
@@ -41,6 +43,24 @@ const PendingApproval = () => {
         return;
       }
 
+      // Fetch registration status
+      const { data: regData } = await supabase
+        .from('user_registrations')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .single();
+
+      if (regData) {
+        setRegistration({
+          status: regData.status,
+          rejection_reason: regData.rejection_reason,
+          reapplication_count: regData.reapplication_count,
+          created_at: regData.created_at,
+          admin_approved_at: regData.admin_approved_at,
+          hr_approved_at: regData.hr_approved_at
+        });
+      }
+
       setLoading(false);
     };
 
@@ -60,13 +80,23 @@ const PendingApproval = () => {
 
       if (userProfile?.account_status === 'APPROVED') {
         navigate('/dashboard');
-      } else if (userProfile) {
-        setRegistration({
-          status: userProfile.account_status === 'REJECTED' ? 'rejected' : 'pending',
-          created_at: userProfile.created_at || new Date().toISOString(),
-          rejection_reason: undefined,
-          reapplication_count: 0
-        });
+      } else {
+        const { data: regData } = await supabase
+          .from('user_registrations')
+          .select('*')
+          .eq('user_id', currentUser.id)
+          .single();
+
+        if (regData) {
+          setRegistration({
+            status: regData.status,
+            rejection_reason: regData.rejection_reason,
+            reapplication_count: regData.reapplication_count,
+            created_at: regData.created_at,
+            admin_approved_at: regData.admin_approved_at,
+            hr_approved_at: regData.hr_approved_at
+          });
+        }
       }
     }
     setIsRefreshing(false);
@@ -95,9 +125,13 @@ const PendingApproval = () => {
   }
 
   const isRejected = profile?.account_status === 'REJECTED';
-  const daysWaiting = profile?.created_at
+  const adminApproved = registration?.admin_approved_at !== null && registration?.admin_approved_at !== undefined;
+  const hrApproved = registration?.hr_approved_at !== null && registration?.hr_approved_at !== undefined;
+  const fullyApproved = adminApproved && hrApproved;
+
+  const daysWaiting = registration?.created_at
     ? Math.floor(
-        (new Date().getTime() - new Date(profile.created_at).getTime()) /
+        (new Date().getTime() - new Date(registration.created_at).getTime()) /
         (1000 * 60 * 60 * 24)
       )
     : 0;
@@ -108,15 +142,27 @@ const PendingApproval = () => {
         {/* Header */}
         <CardHeader className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-t-lg">
           <div className="flex items-center gap-3 mb-2">
-            <Clock className="h-6 w-6" />
+            {isRejected ? (
+              <AlertCircle className="h-6 w-6" />
+            ) : fullyApproved ? (
+              <CheckCircle2 className="h-6 w-6" />
+            ) : (
+              <Clock className="h-6 w-6" />
+            )}
             <CardTitle className="text-2xl">
-              {isRejected ? 'Tài Khoản Bị Từ Chối' : 'Tài Khoản Đang Chờ Phê Duyệt'}
+              {isRejected 
+                ? 'Tài Khoản Bị Từ Chối' 
+                : fullyApproved 
+                ? 'Tài Khoản Đã Được Phê Duyệt' 
+                : 'Tài Khoản Đang Chờ Phê Duyệt'}
             </CardTitle>
           </div>
           <CardDescription className="text-blue-100">
             {isRejected
               ? 'Yêu cầu của bạn không được phê duyệt. Vui lòng xem lý do bên dưới.'
-              : 'Cảm ơn bạn đã đăng ký! Tài khoản của bạn đang được xem xét.'}
+              : fullyApproved
+              ? 'Tài khoản của bạn đã được phê duyệt bởi cả Admin v�� HR. Bạn có thể truy cập hệ thống ngay bây giờ.'
+              : 'Cảm ơn bạn đã đăng ký! Tài khoản của bạn đang được xem xét bởi Admin và HR.'}
           </CardDescription>
         </CardHeader>
 
@@ -129,7 +175,9 @@ const PendingApproval = () => {
               </h3>
               <div className="space-y-1 text-sm">
                 <p className="text-gray-600 dark:text-gray-400">
-                  <span className="font-medium">Họ Tên:</span> {profile.full_name || 'Chưa cập nhật'}
+                  <span className="font-medium">Họ Tên:</span> {profile.first_name && profile.last_name 
+                    ? `${profile.last_name} ${profile.first_name}` 
+                    : 'Chưa cập nhật'}
                 </p>
                 <p className="text-gray-600 dark:text-gray-400">
                   <span className="font-medium">Email:</span> {user?.email}
@@ -143,19 +191,67 @@ const PendingApproval = () => {
             </div>
           )}
 
-          {/* Status Message */}
-          {!isRejected ? (
+          {/* Approval Status - Dual Approval System */}
+          {!isRejected && !fullyApproved && (
             <>
               <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950">
                 <Clock className="h-4 w-4 text-blue-600" />
                 <AlertDescription>
-                  <p className="font-medium text-blue-900 dark:text-blue-100 mb-2">
-                    Tài khoản của bạn đang được xem xét.
+                  <p className="font-medium text-blue-900 dark:text-blue-100 mb-3">
+                    Quy Trình Phê Duyệt Hai Cấp
                   </p>
-                  <p className="text-sm text-blue-800 dark:text-blue-200 mb-2">
-                    Quá trình này thường mất <strong>1-2 ngày làm việc</strong>. Vui lòng kiểm tra email của bạn thường xuyên để cập nhật trạng thái.
+                  <p className="text-sm text-blue-800 dark:text-blue-200 mb-4">
+                    Tài khoản của bạn cần được phê duyệt bởi cả <strong>Admin</strong> và <strong>HR</strong> trước khi có thể truy cập hệ thống.
                   </p>
-                  <p className="text-xs text-blue-700 dark:text-blue-300">
+
+                  {/* Approval Status Grid */}
+                  <div className="grid gap-3 sm:grid-cols-2 mt-4">
+                    <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-blue-100 dark:border-blue-800">
+                      <div className="flex items-center gap-2 mb-2">
+                        {adminApproved ? (
+                          <CheckCircle2 className="h-5 w-5 text-green-600" />
+                        ) : (
+                          <Clock className="h-5 w-5 text-yellow-600" />
+                        )}
+                        <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                          Phê Duyệt Admin
+                        </span>
+                      </div>
+                      {adminApproved ? (
+                        <p className="text-xs text-green-700 dark:text-green-300">
+                          ✓ Đã phê duyệt
+                        </p>
+                      ) : (
+                        <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                          Chờ phê duyệt
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-blue-100 dark:border-blue-800">
+                      <div className="flex items-center gap-2 mb-2">
+                        {hrApproved ? (
+                          <CheckCircle2 className="h-5 w-5 text-green-600" />
+                        ) : (
+                          <Clock className="h-5 w-5 text-yellow-600" />
+                        )}
+                        <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                          Phê Duyệt HR
+                        </span>
+                      </div>
+                      {hrApproved ? (
+                        <p className="text-xs text-green-700 dark:text-green-300">
+                          ✓ Đã phê duyệt
+                        </p>
+                      ) : (
+                        <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                          Chờ phê duyệt
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-blue-700 dark:text-blue-300 mt-4">
                     ⏱️ Đã chờ: <strong>{daysWaiting}</strong> {daysWaiting === 1 ? 'ngày' : 'ngày'}
                   </p>
                 </AlertDescription>
@@ -170,15 +266,32 @@ const PendingApproval = () => {
                       Thông Báo Email
                     </h4>
                     <p className="text-sm text-orange-800 dark:text-orange-200">
-                      Chúng tôi sẽ gửi email cho bạn khi tài khoản được phê duyệt. Hãy chắc chắn kiểm tra cả thư mục Spam.
+                      Chúng tôi sẽ gửi email cho bạn khi tài khoản được phê duyệt bởi cả Admin và HR. Hãy chắc chắn kiểm tra cả thư mục Spam.
                     </p>
                   </div>
                 </div>
               </div>
             </>
-          ) : (
+          )}
+
+          {/* Fully Approved Message */}
+          {fullyApproved && (
+            <Alert className="border-green-200 bg-green-50 dark:bg-green-950">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <AlertDescription>
+                <p className="font-medium text-green-900 dark:text-green-100 mb-2">
+                  Tài Khoản Đã Được Phê Duyệt
+                </p>
+                <p className="text-sm text-green-800 dark:text-green-200">
+                  Cảm ơn bạn! Tài khoản của bạn đã được phê duyệt bởi cả Admin và HR. Nhấn nút "Chuyển Đến Dashboard" để truy cập hệ thống.
+                </p>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Rejection Reason */}
+          {isRejected && (
             <>
-              {/* Rejection Reason */}
               <Alert className="border-red-200 bg-red-50 dark:bg-red-950">
                 <AlertCircle className="h-4 w-4 text-red-600" />
                 <AlertDescription>
@@ -235,7 +348,15 @@ const PendingApproval = () => {
             {isRefreshing ? 'Đang kiểm tra...' : 'Kiểm Tra Lại'}
           </Button>
 
-          <div className="flex gap-3">
+          <div className="flex gap-3 flex-wrap">
+            {fullyApproved && (
+              <Button
+                onClick={() => navigate('/dashboard')}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                Chuyển Đến Dashboard
+              </Button>
+            )}
             {isRejected && (
               <Button
                 onClick={handleReapply}

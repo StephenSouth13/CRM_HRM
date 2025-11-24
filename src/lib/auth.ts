@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
 
-export type UserRole = 'admin' | 'leader' | 'staff';
+export type UserRole = 'admin' | 'leader' | 'staff' | 'hr';
 
 export interface UserProfile {
   id: string;
@@ -137,22 +137,61 @@ export const getPendingRegistrations = async () => {
   return { data: [], error: null };
 };
 
-export const approveRegistration = async (registrationId: string, role: string) => {
-  // user_registrations table doesn't exist
-  return { data: null, error: new Error('User registrations table not available') };
+export const approveRegistration = async (registrationId: string, role: string, approvalBy: 'admin' | 'hr' = 'admin') => {
+  const { data, error } = await supabase.rpc('approve_user_registration', {
+    p_registration_id: registrationId,
+    p_role: role,
+    p_approval_by: approvalBy,
+    p_admin_notes: null
+  });
+
+  if (error) {
+    console.error('Error approving registration:', error);
+    return { data: null, error };
+  }
+
+  return { data, error: null };
 };
 
 export const rejectRegistration = async (registrationId: string, reason: string) => {
-  // user_registrations table doesn't exist
-  return { data: null, error: new Error('User registrations table not available') };
+  const { data, error } = await supabase.rpc('reject_user_registration', {
+    p_registration_id: registrationId,
+    p_rejection_reason: reason
+  });
+
+  if (error) {
+    console.error('Error rejecting registration:', error);
+    return { data: null, error };
+  }
+
+  return { data, error: null };
 };
 
 export const getRegistrationStatus = async (userId: string) => {
-  // user_registrations table doesn't exist, assume user is approved
-  return { data: { status: 'approved', rejection_reason: null, reapplication_count: 0 }, error: null };
+  const { data, error } = await supabase
+    .from('user_registrations')
+    .select('*')
+    .eq('user_id', userId)
+    .single();
+
+  if (error || !data) {
+    return { data: null, error };
+  }
+
+  return {
+    data: {
+      status: data.status,
+      rejection_reason: data.rejection_reason,
+      reapplication_count: data.reapplication_count,
+      admin_approved: data.admin_approved_at !== null,
+      hr_approved: data.hr_approved_at !== null,
+      both_approved: data.admin_approved_at !== null && data.hr_approved_at !== null
+    },
+    error: null
+  };
 };
 
 export const createUserRegistration = async (registrationData: any) => {
-  // user_registrations table doesn't exist, skip registration
+  // user_registrations table automatically creates a trigger on profile insertion
   return { data: null, error: null };
 };

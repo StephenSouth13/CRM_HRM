@@ -121,10 +121,20 @@ const Dashboard = () => {
             setLoading(true);
             try {
                 const user = await getCurrentUser();
-                if (!user) return;
+                if (!user) {
+                    navigate('/auth/login');
+                    return;
+                }
 
-                // Lấy tên người dùng cho tiêu đề
-                const { data: profile } = await supabase.from('profiles').select('first_name, last_name').eq('id', user.id).single();
+                // Check if user is approved (for dual approval system)
+                const { data: profile } = await supabase.from('profiles').select('first_name, last_name, account_status').eq('id', user.id).single();
+
+                // If user is not approved, redirect to pending approval page
+                if (profile?.account_status !== 'APPROVED') {
+                    navigate('/auth/pending-approval');
+                    return;
+                }
+
                 setUserName(profile ? `${profile.last_name || ''} ${profile.first_name || ''}`.trim() : user.email);
 
                 const userRole = await getUserRole(user.id);

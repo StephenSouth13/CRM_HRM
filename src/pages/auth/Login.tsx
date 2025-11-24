@@ -113,9 +113,10 @@ const Login = () => {
                 return;
             }
 
-            // Check account status from profile
+            // Check account status from profile and dual approval
             const profile = await import("@/lib/auth").then(m => m.getUserProfile(user.id));
 
+            // Check if user has been approved by both admin and HR
             if (profile?.account_status !== 'APPROVED') {
                 // Redirect to pending approval page
                 navigate("/auth/pending-approval");
