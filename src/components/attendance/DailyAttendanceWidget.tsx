@@ -198,16 +198,64 @@ const DailyAttendanceWidget = () => {
 
   const loadAllRecords = useCallback(async (uid: string) => {
     try {
-      const { data, error } = await supabase
-        .from('daily_attendance')
+      // Load 90 days of attendance records
+      const ninetyDaysAgo = new Date();
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+      const startDate = ninetyDaysAgo.toISOString();
+
+      const { data: records, error } = await supabase
+        .from('attendance')
         .select('*')
         .eq('user_id', uid)
-        .order('attendance_date', { ascending: false })
-        .limit(90);
+        .gte('timestamp', startDate)
+        .order('timestamp', { ascending: false });
 
       if (error) throw new Error(error.message);
-      setAllRecords(data || []);
-      calculateStats(data || []);
+
+      // Group records by date and create daily summaries
+      const dailyMap = new Map<string, any>();
+
+      (records || []).forEach(record => {
+        const date = record.timestamp.split('T')[0];
+        if (!dailyMap.has(date)) {
+          dailyMap.set(date, {
+            id: `daily-${uid}-${date}`,
+            user_id: uid,
+            attendance_date: date,
+            check_in_time: null,
+            check_out_time: null,
+            total_hours: 0,
+            session_count: 0,
+            status: 'absent',
+            notes: null,
+            created_at: record.created_at
+          });
+        }
+
+        const daily = dailyMap.get(date)!;
+        if (record.type === 'check_in') {
+          if (!daily.check_in_time) {
+            daily.check_in_time = record.timestamp;
+          }
+          daily.session_count += 1;
+        } else if (record.type === 'check_out') {
+          daily.check_out_time = record.timestamp;
+        }
+      });
+
+      // Calculate hours and determine status
+      const dailyRecords = Array.from(dailyMap.values()).map(daily => {
+        if (daily.check_in_time && daily.check_out_time) {
+          const inTime = new Date(daily.check_in_time).getTime();
+          const outTime = new Date(daily.check_out_time).getTime();
+          daily.total_hours = (outTime - inTime) / (1000 * 60 * 60);
+          daily.status = 'present';
+        }
+        return daily;
+      });
+
+      setAllRecords(dailyRecords);
+      calculateStats(dailyRecords);
     } catch (error) {
       let errorMessage = 'Không thể tải lịch sử chấm công';
       try {
@@ -309,7 +357,7 @@ const DailyAttendanceWidget = () => {
 
       // Find the unclosed session
       const unclosedSession = todaySessions.find(s => !s.check_out);
-      if (!unclosedSession) throw new Error("Không tìm thấy phiên làm việc");
+      if (!unclosedSession) throw new Error("Không tìm thấy phi��n làm việc");
 
       const { error } = await supabase
         .from('attendance_sessions')
