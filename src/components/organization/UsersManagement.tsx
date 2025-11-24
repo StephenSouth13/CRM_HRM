@@ -149,26 +149,21 @@ const UsersManagement = () => {
             const userId = selectedUserForRole.id;
             const newTeamId = selectedTeam === 'none' ? null : selectedTeam;
             const newShiftId = selectedShift === 'none' ? null : selectedShift;
-            
+
             // 1. CẬP NHẬT VỊ TRÍ (PROFILE)
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const { error: profileError } = await supabase
                 .from('profiles')
-                .update({ team_id: newTeamId, shift_id: newShiftId } as unknown) 
+                .update({ team_id: newTeamId, shift_id: newShiftId } as unknown)
                 .eq('id', userId);
 
             if (profileError) throw profileError;
 
-            // 2. CẬP NHẬT VAI TRÒ (USER_ROLES)
-            // 2a. Xóa role cũ
-            const { error: deleteError } = await supabase.from('user_roles').delete().eq('user_id', userId);
-            if (deleteError) throw deleteError;
-
-            // 2b. Chèn role mới
+            // 2. CẬP NHẬT VAI TRÒ (USER_ROLES) - Sử dụng UPSERT thay vì DELETE + INSERT
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const { error: roleError } = await supabase
                 .from('user_roles')
-                .insert({ user_id: userId, role: selectedNewRole as any });
+                .upsert({ user_id: userId, role: selectedNewRole } as unknown, { onConflict: 'user_id' });
 
             if (roleError) throw roleError;
 
@@ -180,6 +175,8 @@ const UsersManagement = () => {
             setIsRoleModalOpen(false);
             setSelectedUserForRole(null);
             setSelectedNewRole('');
+            setSelectedTeam('');
+            setSelectedShift('');
             await fetchUsers();
         } catch (error) {
             console.error("Lỗi cập nhật:", error);
