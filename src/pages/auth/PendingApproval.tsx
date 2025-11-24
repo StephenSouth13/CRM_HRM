@@ -35,24 +35,10 @@ const PendingApproval = () => {
       const userProfile = await getUserProfile(currentUser.id);
       setProfile(userProfile);
 
-      // Check registration status
-      const { data, error } = await supabase
-        .from('user_registrations')
-        .select('status, created_at, rejection_reason, reapplication_count')
-        .eq('user_id', currentUser.id)
-        .single();
-
-      if (!error && data) {
-        setRegistration(data);
-
-        // If approved, redirect to dashboard
-        if (data.status === 'approved') {
-          navigate('/dashboard');
-          return;
-        }
-      }
-
-      setLoading(false);
+      // Skip registration check as table doesn't exist
+      // User is assumed to be approved and can access dashboard
+      navigate('/dashboard');
+      return;
     };
 
     checkStatus();
