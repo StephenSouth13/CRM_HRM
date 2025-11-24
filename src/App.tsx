@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Index from "./pages/Index";
 import Login from "./pages/auth/Login";
 import ForgotPassword from "./pages/auth/ForgotPassword";
+import PendingApproval from "./pages/auth/PendingApproval";
 import Dashboard from "./pages/Dashboard";
 import Attendance from "./pages/Attendance";
 import Tasks from "./pages/Tasks";
