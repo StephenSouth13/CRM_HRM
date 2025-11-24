@@ -15,6 +15,7 @@ import Leave from "./pages/Leave";
 import Organization from "./pages/Organization";
 import NotFound from "./pages/NotFound";
 import Profile from "./pages/Profile";
+import Settings from "./pages/Settings";
 import RegistrationApprovals from "./pages/admin/RegistrationApprovals";
 
 const queryClient = new QueryClient();
