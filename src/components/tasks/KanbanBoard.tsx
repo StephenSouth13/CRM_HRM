@@ -465,6 +465,76 @@ export const KanbanBoard = ({ teamId, userId, users }: KanbanBoardProps) => {
 
     return (
         <div className="space-y-4">
+            {/* Search and Filter Controls */}
+            <div className="bg-secondary/50 p-4 rounded-lg space-y-3">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold">Tìm kiếm & Lọc</h3>
+                    {hasActiveFilters && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={clearFilters}
+                            className="text-xs"
+                        >
+                            <X className="h-4 w-4 mr-1" />
+                            Xóa lọc
+                        </Button>
+                    )}
+                </div>
+
+                {/* Search Input */}
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Tìm kiếm công việc theo tiêu đề hoặc mô tả..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10 bg-white dark:bg-gray-700"
+                    />
+                </div>
+
+                {/* Filters Row */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Priority Filter */}
+                    <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                        <SelectTrigger className="bg-white dark:bg-gray-700">
+                            <SelectValue placeholder="Lọc theo ưu tiên" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Tất cả ưu tiên</SelectItem>
+                            {uniquePriorities.map(priority => (
+                                <SelectItem key={priority} value={priority}>
+                                    {priority.charAt(0).toUpperCase() + priority.slice(1)}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    {/* Assignee Filter */}
+                    <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
+                        <SelectTrigger className="bg-white dark:bg-gray-700">
+                            <SelectValue placeholder="Lọc theo người được giao" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Tất cả người được giao</SelectItem>
+                            {uniqueAssignees.map(assigneeId => (
+                                <SelectItem key={assigneeId} value={assigneeId}>
+                                    ID: {assigneeId.substring(0, 8)}...
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                {/* Results Info */}
+                <div className="text-xs text-muted-foreground">
+                    {filteredTasks.length === tasks.length
+                        ? `Tổng cộng ${tasks.length} công việc`
+                        : `Hiển thị ${filteredTasks.length} / ${tasks.length} công việc`}
+                </div>
+            </div>
+
+            {/* Header with Add Column Button */}
             <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold">Bảng Kanban</h2>
                 <Dialog open={isAddColumnOpen} onOpenChange={setIsAddColumnOpen}>
