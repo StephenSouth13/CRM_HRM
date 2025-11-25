@@ -31,6 +31,8 @@ interface NavItem {
 interface DashboardLayoutProps {
     children: ReactNode;
     role?: UserRole;
+    organizationSection?: string;
+    onOrganizationSectionChange?: (section: string) => void;
 }
 
 const DashboardLayout = ({ children, role = 'staff' }: DashboardLayoutProps) => {
