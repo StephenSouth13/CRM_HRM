@@ -12,12 +12,11 @@ interface Task {
   status: 'todo' | 'in_progress' | 'review' | 'done';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   deadline: string | null;
-  start_date: string | null;
 }
 
 interface TaskCalendarViewProps {
   tasks: Task[];
-  onTaskReschedule: (taskId: string, startDate: string | null, deadline: string | null) => void;
+  onTaskReschedule: (taskId: string, deadline: string | null) => void;
 }
 
 const TaskCalendarView = ({ tasks, onTaskReschedule }: TaskCalendarViewProps) => {
@@ -141,7 +140,7 @@ const TaskCalendarView = ({ tasks, onTaskReschedule }: TaskCalendarViewProps) =>
       <Card className="bg-muted/30">
         <CardContent className="pt-6">
           <p className="text-sm text-muted-foreground">
-            💡 Tip: Nhấn vào một ngày để xem chi tiết công việc hoặc kéo thả để đổi ngày đến hạn.
+            💡 Tip: Hiển thị các công việc có deadline trong tháng này. Sử dụng chỉnh sửa công việc để thay đổi deadline.
           </p>
         </CardContent>
       </Card>
