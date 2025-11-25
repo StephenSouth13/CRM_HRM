@@ -159,7 +159,13 @@ const AttendanceManagement = () => {
         });
       }
     } catch (error) {
-      console.error('Error loading location settings:', error);
+      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+      console.error('Error loading location settings:', errorMessage);
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: `Không thể tải cài đặt vị trí: ${errorMessage}`
+      });
     }
   }, []);
 
