@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Calendar, BarChart3, Loader2 } from "lucide-react";
 import TaskCalendarView from "./TaskCalendarView";
 import TaskGanttChart from "./TaskGanttChart";
+import { format } from "date-fns";
 
 interface Task {
   id: string;
@@ -16,14 +17,12 @@ interface Task {
   status: 'todo' | 'in_progress' | 'review' | 'done';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   deadline: string | null;
-  start_date: string | null;
-  duration_days: number | null;
-  progress_percentage: number;
   assignee_id: string | null;
   creator_id: string;
   team_id: string | null;
   created_at: string;
-  assignee?: { first_name: string; last_name: string };
+  updated_at: string;
+  completed_at: string | null;
 }
 
 const ScheduleTab = () => {
@@ -56,15 +55,15 @@ const ScheduleTab = () => {
         .from('tasks')
         .select('*')
         .or(`assignee_id.eq.${user.id},creator_id.eq.${user.id}`)
-        .order('deadline', { ascending: true });
+        .order('deadline', { ascending: true, nullsLast: true });
 
       if (error) throw error;
       setTasks(data || []);
     } catch (error) {
       console.error('Error fetching tasks:', error);
       toast({
-        title: "Error",
-        description: "Failed to load tasks for scheduling",
+        title: "Lỗi",
+        description: "Không thể tải công việc cho lịch biểu",
         variant: "destructive"
       });
     } finally {
@@ -72,12 +71,11 @@ const ScheduleTab = () => {
     }
   };
 
-  const handleTaskReschedule = async (taskId: string, newStartDate: string | null, newDeadline: string | null) => {
+  const handleTaskReschedule = async (taskId: string, newDeadline: string | null) => {
     try {
       const { error } = await supabase
         .from('tasks')
         .update({
-          start_date: newStartDate,
           deadline: newDeadline,
           updated_at: new Date().toISOString()
         })
@@ -86,16 +84,16 @@ const ScheduleTab = () => {
       if (error) throw error;
 
       toast({
-        title: "Success",
-        description: "Task rescheduled successfully"
+        title: "Thành công",
+        description: "Công việc đã được cập nhật lịch biểu"
       });
 
       fetchTasks();
     } catch (error) {
       console.error('Error rescheduling task:', error);
       toast({
-        title: "Error",
-        description: "Failed to reschedule task",
+        title: "Lỗi",
+        description: "Không thể cập nhật lịch biểu",
         variant: "destructive"
       });
     }
@@ -110,6 +108,13 @@ const ScheduleTab = () => {
       </Card>
     );
   }
+
+  const tasksSortedByDeadline = tasks
+    .filter(t => t.deadline)
+    .sort((a, b) => {
+      if (!a.deadline || !b.deadline) return 0;
+      return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+    });
 
   return (
     <div className="space-y-4">
@@ -138,7 +143,7 @@ const ScheduleTab = () => {
 
             <TabsContent value="calendar" className="mt-6">
               <TaskCalendarView 
-                tasks={tasks} 
+                tasks={tasks}
                 onTaskReschedule={handleTaskReschedule}
               />
             </TabsContent>
@@ -153,8 +158,11 @@ const ScheduleTab = () => {
         </CardContent>
       </Card>
 
-      <div className="text-sm text-muted-foreground">
+      <div className="text-sm text-muted-foreground space-y-2">
         <p>📊 Tổng cộng: <strong>{tasks.length}</strong> công việc</p>
+        {tasksSortedByDeadline.length > 0 && (
+          <p>📅 Công việc sắp tới: <strong>{tasksSortedByDeadline.slice(0, 1).map(t => format(new Date(t.deadline!), 'dd MMM yyyy')).join(', ')}</strong></p>
+        )}
       </div>
     </div>
   );

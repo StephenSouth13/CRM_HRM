@@ -602,6 +602,107 @@ export type Database = {
           },
         ]
       }
+      daily_reports: {
+        Row: {
+          id: string
+          user_id: string
+          report_date: string
+          content: string
+          tasks_completed: string[] | null
+          status: Database["public"]["Enums"]["report_status"]
+          approved_by: string | null
+          submitted_at: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          report_date: string
+          content: string
+          tasks_completed?: string[] | null
+          status?: Database["public"]["Enums"]["report_status"]
+          approved_by?: string | null
+          submitted_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          report_date?: string
+          content?: string
+          tasks_completed?: string[] | null
+          status?: Database["public"]["Enums"]["report_status"]
+          approved_by?: string | null
+          submitted_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_reports_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_reports_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meeting_minutes: {
+        Row: {
+          id: string
+          title: string
+          meeting_date: string
+          notes: string | null
+          attendees: string[] | null
+          created_by: string
+          status: Database["public"]["Enums"]["meeting_status"]
+          action_items: string[] | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          meeting_date: string
+          notes?: string | null
+          attendees?: string[] | null
+          created_by: string
+          status?: Database["public"]["Enums"]["meeting_status"]
+          action_items?: string[] | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          meeting_date?: string
+          notes?: string | null
+          attendees?: string[] | null
+          created_by?: string
+          status?: Database["public"]["Enums"]["meeting_status"]
+          action_items?: string[] | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_minutes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -655,6 +756,8 @@ export type Database = {
       leave_type: "annual" | "sick" | "personal" | "unpaid"
       task_priority: "low" | "medium" | "high" | "urgent"
       task_status: "todo" | "in_progress" | "review" | "done"
+      report_status: "submitted" | "pending_review" | "approved" | "rejected"
+      meeting_status: "draft" | "completed" | "archived"
     }
     CompositeTypes: {
       [_ in never]: never

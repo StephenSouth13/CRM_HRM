@@ -12,21 +12,16 @@ interface Task {
   status: 'todo' | 'in_progress' | 'review' | 'done';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   deadline: string | null;
-  start_date: string | null;
-  duration_days: number | null;
-  progress_percentage: number;
-  assignee?: { first_name: string; last_name: string };
 }
 
 interface TaskGanttChartProps {
   tasks: Task[];
-  onTaskReschedule: (taskId: string, startDate: string | null, deadline: string | null) => void;
+  onTaskReschedule: (taskId: string, deadline: string | null) => void;
 }
 
 const TaskGanttChart = ({ tasks, onTaskReschedule }: TaskGanttChartProps) => {
   const [startViewDate, setStartViewDate] = useState(new Date());
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
-  const [dragOffset, setDragOffset] = useState(0);
   const chartDays = 30;
 
   const getStatusColor = (status: string) => {
@@ -48,27 +43,30 @@ const TaskGanttChart = ({ tasks, onTaskReschedule }: TaskGanttChartProps) => {
   };
 
   const getTaskPosition = (task: Task) => {
-    const taskStart = task.start_date ? parseISO(task.start_date) : new Date();
-    const taskEnd = task.deadline ? parseISO(task.deadline) : taskStart;
-    const daysFromStart = differenceInDays(taskStart, startViewDate);
-    const duration = Math.max(1, differenceInDays(taskEnd, taskStart) + 1);
+    if (!task.deadline) {
+      return { left: 0, width: 0 };
+    }
+
+    const taskDate = parseISO(task.deadline);
+    const daysFromStart = differenceInDays(taskDate, startViewDate);
+
+    if (daysFromStart < 0 || daysFromStart >= chartDays) {
+      return { left: -1, width: 0 };
+    }
 
     return {
-      left: Math.max(0, Math.min(daysFromStart, chartDays - 1)),
-      width: Math.min(chartDays - Math.max(0, daysFromStart), duration),
+      left: daysFromStart,
+      width: 2,
     };
   };
 
   const handleTaskDragStart = (e: React.DragEvent<HTMLDivElement>, task: Task) => {
     setDraggedTaskId(task.id);
-    const rect = (e.currentTarget).getBoundingClientRect();
-    setDragOffset(e.clientX - rect.left);
     e.dataTransfer.effectAllowed = 'move';
   };
 
   const handleTaskDragEnd = () => {
     setDraggedTaskId(null);
-    setDragOffset(0);
   };
 
   const handleDayDrop = (e: React.DragEvent<HTMLDivElement>, dayIndex: number) => {
@@ -80,22 +78,24 @@ const TaskGanttChart = ({ tasks, onTaskReschedule }: TaskGanttChartProps) => {
     if (!task) return;
 
     const newDate = addDays(startViewDate, dayIndex);
-    const currentStart = task.start_date ? parseISO(task.start_date) : new Date();
-    const currentEnd = task.deadline ? parseISO(task.deadline) : currentStart;
-    const duration = differenceInDays(currentEnd, currentStart);
+    const newDeadline = format(newDate, 'yyyy-MM-dd');
 
-    const newStartDate = format(newDate, 'yyyy-MM-dd');
-    const newEndDate = format(addDays(newDate, duration), 'yyyy-MM-dd');
-
-    onTaskReschedule(draggedTaskId, newStartDate, newEndDate);
+    onTaskReschedule(draggedTaskId, newDeadline);
     handleTaskDragEnd();
   };
 
-  const sortedTasks = [...tasks].sort((a, b) => {
-    const aDate = a.deadline || a.start_date;
-    const bDate = b.deadline || b.start_date;
-    if (!aDate || !bDate) return 0;
-    return new Date(aDate).getTime() - new Date(bDate).getTime();
+  const sortedTasks = [...tasks]
+    .filter(t => t.deadline)
+    .sort((a, b) => {
+      if (!a.deadline || !b.deadline) return 0;
+      return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+    });
+
+  const tasksWithinRange = sortedTasks.filter(task => {
+    if (!task.deadline) return false;
+    const taskDate = parseISO(task.deadline);
+    const daysFromStart = differenceInDays(taskDate, startViewDate);
+    return daysFromStart >= -7 && daysFromStart <= chartDays + 7;
   });
 
   return (
@@ -155,7 +155,7 @@ const TaskGanttChart = ({ tasks, onTaskReschedule }: TaskGanttChartProps) => {
           </div>
 
           {/* Tasks */}
-          {sortedTasks.map((task) => {
+          {tasksWithinRange.map((task) => {
             const position = getTaskPosition(task);
             const taskName = task.title.length > 30 ? task.title.substring(0, 27) + '...' : task.title;
 
@@ -165,9 +165,11 @@ const TaskGanttChart = ({ tasks, onTaskReschedule }: TaskGanttChartProps) => {
                   <div className="font-medium truncate" title={task.title}>
                     {taskName}
                   </div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    {task.progress_percentage}% hoàn thành
-                  </div>
+                  {task.deadline && (
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Deadline: {format(parseISO(task.deadline), 'dd MMM yyyy', { locale: vi })}
+                    </div>
+                  )}
                   <Badge variant="outline" className="text-xs mt-2">
                     {task.status}
                   </Badge>
@@ -184,14 +186,14 @@ const TaskGanttChart = ({ tasks, onTaskReschedule }: TaskGanttChartProps) => {
                   ))}
 
                   {/* Task Bar */}
-                  {position.width > 0 && (
+                  {position.width > 0 && position.left >= 0 && (
                     <div
                       className={`absolute top-2 h-12 rounded cursor-move hover:opacity-80 transition-opacity flex items-center px-2 ${getStatusColor(task.status)} text-white text-xs font-medium overflow-hidden whitespace-nowrap ${draggedTaskId === task.id ? 'opacity-50' : ''}`}
                       style={{
                         left: `calc(16rem + ${position.left * 48}px)`,
                         width: `${position.width * 48}px`,
                       }}
-                      title={`${task.title} - ${task.progress_percentage}% done`}
+                      title={`${task.title}`}
                       draggable
                       onDragStart={(e) => handleTaskDragStart(e, task)}
                       onDragEnd={handleTaskDragEnd}
@@ -204,9 +206,9 @@ const TaskGanttChart = ({ tasks, onTaskReschedule }: TaskGanttChartProps) => {
             );
           })}
 
-          {sortedTasks.length === 0 && (
+          {tasksWithinRange.length === 0 && (
             <div className="p-8 text-center text-muted-foreground">
-              Không có công việc nào để hiển thị
+              Không có công việc có deadline trong khoảng thời gian này
             </div>
           )}
         </div>

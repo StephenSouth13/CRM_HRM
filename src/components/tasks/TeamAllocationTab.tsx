@@ -40,7 +40,7 @@ const TeamAllocationTab = ({ role }: TeamAllocationTabProps) => {
   const { toast } = useToast();
 
   // Check if user has access to this tab
-  const hasAccess = ['admin', 'leader', 'hr'].includes(role);
+  const hasAccess = ['admin', 'leader'].includes(role);
 
   useEffect(() => {
     if (hasAccess) {
@@ -64,23 +64,75 @@ const TeamAllocationTab = ({ role }: TeamAllocationTabProps) => {
         }
       }
 
-      // Fetch team workload data
-      const { data, error } = await supabase
-        .from('team_workload')
-        .select('*')
-        .order('workload_percentage', { ascending: false });
+      // Fetch all tasks
+      let tasksQuery = supabase.from('tasks').select('*');
 
-      if (error) throw error;
-
-      // Filter based on role and selected team
-      let filtered = data || [];
-      if (role === 'leader' && selectedTeam !== 'all') {
-        filtered = filtered.filter(w => w.team_id === selectedTeam);
+      // If not admin, filter by team
+      if (role === 'leader' && selectedTeam !== 'all' && userTeam) {
+        tasksQuery = tasksQuery.eq('team_id', userTeam);
+      } else if (selectedTeam !== 'all') {
+        tasksQuery = tasksQuery.eq('team_id', selectedTeam);
       }
+
+      const { data: tasks, error: tasksError } = await tasksQuery;
+
+      if (tasksError) throw tasksError;
+
+      // Calculate workload for each assignee
+      const workloadMap = new Map<string, TeamWorkload>();
+
+      if (tasks) {
+        tasks.forEach(task => {
+          if (task.assignee_id) {
+            if (!workloadMap.has(task.assignee_id)) {
+              workloadMap.set(task.assignee_id, {
+                user_id: task.assignee_id,
+                total_tasks_assigned: 0,
+                total_tasks_in_progress: 0,
+                total_tasks_overdue: 0,
+                total_tasks_completed: 0,
+                workload_percentage: 0
+              });
+            }
+
+            const workload = workloadMap.get(task.assignee_id)!;
+            workload.total_tasks_assigned++;
+
+            if (task.status === 'in_progress') {
+              workload.total_tasks_in_progress++;
+            }
+
+            if (task.status === 'done') {
+              workload.total_tasks_completed++;
+            }
+
+            // Check if task is overdue
+            if (task.deadline) {
+              const deadlineDate = new Date(task.deadline);
+              const today = new Date();
+              if (deadlineDate < today && task.status !== 'done') {
+                workload.total_tasks_overdue++;
+              }
+            }
+          }
+        });
+      }
+
+      // Convert map to array
+      const workloadArray = Array.from(workloadMap.values());
+
+      // Calculate workload percentage based on average of assigned tasks
+      const avgTasks = workloadArray.length > 0
+        ? workloadArray.reduce((sum, w) => sum + w.total_tasks_assigned, 0) / workloadArray.length
+        : 0;
+
+      workloadArray.forEach(workload => {
+        workload.workload_percentage = avgTasks > 0 ? Math.min(100, Math.round((workload.total_tasks_assigned / avgTasks) * 100)) : 0;
+      });
 
       // Fetch member details for each workload record
       const withMembers = await Promise.all(
-        filtered.map(async (workload) => {
+        workloadArray.map(async (workload) => {
           const { data: memberData } = await supabase
             .from('profiles')
             .select('id, first_name, last_name, email, avatar_url')
@@ -94,12 +146,15 @@ const TeamAllocationTab = ({ role }: TeamAllocationTabProps) => {
         })
       );
 
+      // Sort by workload percentage descending
+      withMembers.sort((a, b) => b.workload_percentage - a.workload_percentage);
+
       setTeamMembers(withMembers);
     } catch (error) {
       console.error('Error loading team data:', error);
       toast({
-        title: "Error",
-        description: "Failed to load team allocation data",
+        title: "Lỗi",
+        description: "Không thể tải dữ liệu phân bổ nhóm",
         variant: "destructive"
       });
     } finally {
@@ -133,7 +188,7 @@ const TeamAllocationTab = ({ role }: TeamAllocationTabProps) => {
           <AlertCircle className="h-5 w-5 text-amber-600" />
           <div>
             <p className="font-semibold text-amber-900">Quyền Truy Cập Bị Từ Chối</p>
-            <p className="text-sm text-amber-700">Chỉ Trưởng nhóm, Quản trị viên và Nhân viên HR mới có thể xem thông tin phân bổ nhóm.</p>
+            <p className="text-sm text-amber-700">Chỉ Trưởng nhóm và Quản trị viên mới có thể xem thông tin phân bổ nhóm.</p>
           </div>
         </CardContent>
       </Card>
@@ -266,7 +321,7 @@ const TeamAllocationTab = ({ role }: TeamAllocationTabProps) => {
             <Briefcase className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
             <div className="text-sm">
               <p className="font-semibold text-blue-900">Cập nhật Thời gian Thực</p>
-              <p className="text-blue-700 text-xs mt-1">Dữ liệu được cập nhật tự động khi có thay đổi trên công việc. Làm mới để xem dữ liệu mới nhất.</p>
+              <p className="text-blue-700 text-xs mt-1">Dữ liệu được tính toán từ công việc hiện tại. Làm mới để xem dữ liệu mới nhất.</p>
               <Button variant="outline" size="sm" className="mt-2" onClick={loadTeamData}>
                 Làm mới dữ liệu
               </Button>
