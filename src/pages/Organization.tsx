@@ -46,43 +46,75 @@ const Organization = () => {
 
   return (
     <DashboardLayout role={role}>
-      <div className="space-y-4 md:space-y-6 animate-fade-in pb-20 md:pb-6">
-        <div className="mb-2">
+      <div className="animate-fade-in pb-20 md:pb-6">
+        <div className="mb-6">
           <h1 className="bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent text-2xl md:text-3xl lg:text-4xl">
             Quản Lý Tổ Chức
           </h1>
           <p className="text-muted-foreground mt-1 md:mt-2 text-sm md:text-base">Quản lý đội nhóm, người dùng, ca làm, chấm công và lương</p>
         </div>
 
-        <Tabs defaultValue="teams" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 gap-1">
-            <TabsTrigger value="teams" className="data-[state=active]:bg-primary text-xs md:text-sm">Đội nhóm</TabsTrigger>
-            <TabsTrigger value="users" className="data-[state=active]:bg-primary text-xs md:text-sm">Người dùng</TabsTrigger>
-            <TabsTrigger value="shifts" className="data-[state=active]:bg-primary text-xs md:text-sm">Ca làm</TabsTrigger>
-            <TabsTrigger value="attendance" className="data-[state=active]:bg-primary text-xs md:text-sm">Chấm công</TabsTrigger>
-            <TabsTrigger value="salary" className="data-[state=active]:bg-primary text-xs md:text-sm">Lương</TabsTrigger>
-            <TabsTrigger value="statistics" className="data-[state=active]:bg-primary text-xs md:text-sm">Thống kê</TabsTrigger>
-          </TabsList>
+        <Accordion type="single" collapsible defaultValue="teams" className="w-full space-y-4">
+          <AccordionItem value="teams">
+            <AccordionTrigger className="flex items-center gap-2 text-base md:text-lg hover:bg-accent px-3 rounded-lg">
+              <Users className="h-5 w-5" />
+              <span>Đội nhóm</span>
+            </AccordionTrigger>
+            <AccordionContent className="mt-4 px-2">
+              <TeamsManagement />
+            </AccordionContent>
+          </AccordionItem>
 
-          <TabsContent value="teams" className="mt-6">
-            <TeamsManagement />
-          </TabsContent>
-          <TabsContent value="users" className="mt-6">
-            <UsersManagement />
-          </TabsContent>
-          <TabsContent value="shifts" className="mt-6">
-            <ShiftsManagement />
-          </TabsContent>
-          <TabsContent value="attendance" className="mt-6">
-            <AttendanceManagement />
-          </TabsContent>
-          <TabsContent value="salary" className="mt-6">
-            <SalaryManagement />
-          </TabsContent>
-          <TabsContent value="statistics" className="mt-6">
-            <SalaryStatistics />
-          </TabsContent>
-        </Tabs>
+          <AccordionItem value="users">
+            <AccordionTrigger className="flex items-center gap-2 text-base md:text-lg hover:bg-accent px-3 rounded-lg">
+              <Users className="h-5 w-5" />
+              <span>Người dùng</span>
+            </AccordionTrigger>
+            <AccordionContent className="mt-4 px-2">
+              <UsersManagement />
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="shifts">
+            <AccordionTrigger className="flex items-center gap-2 text-base md:text-lg hover:bg-accent px-3 rounded-lg">
+              <Clock className="h-5 w-5" />
+              <span>Ca làm</span>
+            </AccordionTrigger>
+            <AccordionContent className="mt-4 px-2">
+              <ShiftsManagement />
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="attendance">
+            <AccordionTrigger className="flex items-center gap-2 text-base md:text-lg hover:bg-accent px-3 rounded-lg">
+              <CheckSquare className="h-5 w-5" />
+              <span>Chấm công</span>
+            </AccordionTrigger>
+            <AccordionContent className="mt-4 px-2">
+              <AttendanceManagement />
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="salary">
+            <AccordionTrigger className="flex items-center gap-2 text-base md:text-lg hover:bg-accent px-3 rounded-lg">
+              <DollarSign className="h-5 w-5" />
+              <span>Lương</span>
+            </AccordionTrigger>
+            <AccordionContent className="mt-4 px-2">
+              <SalaryManagement />
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="statistics">
+            <AccordionTrigger className="flex items-center gap-2 text-base md:text-lg hover:bg-accent px-3 rounded-lg">
+              <LineChart className="h-5 w-5" />
+              <span>Thống kê</span>
+            </AccordionTrigger>
+            <AccordionContent className="mt-4 px-2">
+              <SalaryStatistics />
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </div>
     </DashboardLayout>
   );
