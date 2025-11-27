@@ -108,7 +108,7 @@ const useBoard = (teamId: string) => {
             return createdTask;
         } catch (error) {
             console.error('Error creating task:', error);
-            toast({ title: 'Lỗi', description: 'Không tạo đư��c công việc', variant: 'destructive' });
+            toast({ title: 'Lỗi', description: 'Không tạo được công việc', variant: 'destructive' });
         }
     }, [toast]);
 
@@ -737,6 +737,8 @@ const TaskCard = ({ task, users, groups, spaces, onUpdate, onDelete }: TaskCardP
     const [isLoading, setIsLoading] = useState(false);
 
     const assignee = users.find(u => u.id === task.assignee_id);
+    const group = groups.find(g => g.id === task.group_id);
+    const space = spaces.find(s => s.id === task.space_id);
 
     const handleSave = async () => {
         setIsLoading(true);
