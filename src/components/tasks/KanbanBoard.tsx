@@ -575,6 +575,8 @@ interface KanbanColumnProps {
     tasks: Task[];
     userId: string;
     teamId: string;
+    selectedGroupId: string;
+    selectedSpaceId: string;
     users: Array<{ id: string; first_name?: string; last_name?: string; avatar_url?: string | null }>;
     onCreateTask: (task: Omit<Task, 'id' | 'created_at' | 'updated_at' | 'completed_at'>) => Promise<Task | undefined>;
     onUpdateTask: (taskId: string, updates: Partial<Task>) => Promise<Task | undefined>;
@@ -586,6 +588,8 @@ const KanbanColumn = ({
     tasks,
     userId,
     teamId,
+    selectedGroupId,
+    selectedSpaceId,
     users,
     onCreateTask,
     onUpdateTask,
