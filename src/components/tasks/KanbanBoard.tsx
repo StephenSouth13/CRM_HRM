@@ -384,7 +384,7 @@ export const KanbanBoard = ({ teamId, userId, users }: KanbanBoardProps) => {
 
     const hasActiveFilters = searchQuery || priorityFilter !== 'all' || assigneeFilter !== 'all';
 
-    if (loading || groupsLoading) {
+    if (loading) {
         return (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {Array.from({ length: 4 }).map((_, i) => (
@@ -405,80 +405,84 @@ export const KanbanBoard = ({ teamId, userId, users }: KanbanBoardProps) => {
 
     return (
         <div className="space-y-4">
-            {/* Group and Space Selection Controls */}
-            <div className="bg-primary/5 p-4 rounded-lg border border-primary/10 space-y-3">
-                <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-                    <h3 className="text-sm font-semibold text-muted-foreground">Chọn Nhóm & Không Gian</h3>
-                    {(selectedGroupId || selectedSpaceId) && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                                setSelectedGroupId(groups[0]?.id || '');
-                                setSelectedSpaceId('');
-                            }}
-                            className="text-xs"
-                        >
-                            <X className="h-3 w-3 mr-1" />
-                            Đặt lại
-                        </Button>
-                    )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {/* Group Selector */}
-                    <Select value={selectedGroupId} onValueChange={handleGroupChange}>
-                        <SelectTrigger className="bg-white dark:bg-gray-700">
-                            <SelectValue placeholder="Chọn Nhóm..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {groups.map(group => (
-                                <SelectItem key={group.id} value={group.id}>
-                                    <span className="flex items-center gap-2">
-                                        <span
-                                            className="w-2 h-2 rounded-full"
-                                            style={{ backgroundColor: `var(--color-${group.color || 'blue'})` }}
-                                        ></span>
-                                        {group.name}
-                                    </span>
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-
-                    {/* Space Selector */}
-                    {spaces.length > 0 && (
-                        <Select value={selectedSpaceId || '__all__'} onValueChange={(value) => setSelectedSpaceId(value === '__all__' ? '' : value)}>
-                            <SelectTrigger className="bg-white dark:bg-gray-700">
-                                <SelectValue placeholder="Chọn Không Gian..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="__all__">Tất cả Không Gian</SelectItem>
-                                {spaces.map(space => (
-                                    <SelectItem key={space.id} value={space.id}>
-                                        <span className="flex items-center gap-2">
-                                            <span
-                                                className="w-2 h-2 rounded-full"
-                                                style={{ backgroundColor: `var(--color-${space.color || 'cyan'})` }}
-                                            ></span>
-                                            {space.name}
-                                        </span>
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    )}
-                </div>
-
-                {selectedGroupId && (
-                    <div className="text-xs text-muted-foreground">
-                        Nhóm: <span className="font-semibold">{groups.find(g => g.id === selectedGroupId)?.name}</span>
-                        {selectedSpaceId && (
-                            <> • Không gian: <span className="font-semibold">{spaces.find(s => s.id === selectedSpaceId)?.name}</span></>
+            {/* Group and Space Selection Controls - Only show if groups exist */}
+            {groups.length > 0 && (
+                <div className="bg-primary/5 p-4 rounded-lg border border-primary/10 space-y-3">
+                    <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+                        <h3 className="text-sm font-semibold text-muted-foreground">Chọn Nhóm & Không Gian</h3>
+                        {(selectedGroupId || selectedSpaceId) && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                    setSelectedGroupId(groups[0]?.id || '');
+                                    setSelectedSpaceId('');
+                                }}
+                                className="text-xs"
+                            >
+                                <X className="h-3 w-3 mr-1" />
+                                Đặt lại
+                            </Button>
                         )}
                     </div>
-                )}
-            </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {/* Group Selector */}
+                        {groups.length > 0 && (
+                            <Select value={selectedGroupId || ''} onValueChange={handleGroupChange}>
+                                <SelectTrigger className="bg-white dark:bg-gray-700">
+                                    <SelectValue placeholder="Chọn Nhóm..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {groups.map(group => (
+                                        <SelectItem key={group.id} value={group.id}>
+                                            <span className="flex items-center gap-2">
+                                                <span
+                                                    className="w-2 h-2 rounded-full"
+                                                    style={{ backgroundColor: `var(--color-${group.color || 'blue'})` }}
+                                                ></span>
+                                                {group.name}
+                                            </span>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
+
+                        {/* Space Selector */}
+                        {spaces.length > 0 && (
+                            <Select value={selectedSpaceId || '__all__'} onValueChange={(value) => setSelectedSpaceId(value === '__all__' ? '' : value)}>
+                                <SelectTrigger className="bg-white dark:bg-gray-700">
+                                    <SelectValue placeholder="Chọn Không Gian..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="__all__">Tất cả Không Gian</SelectItem>
+                                    {spaces.map(space => (
+                                        <SelectItem key={space.id} value={space.id}>
+                                            <span className="flex items-center gap-2">
+                                                <span
+                                                    className="w-2 h-2 rounded-full"
+                                                    style={{ backgroundColor: `var(--color-${space.color || 'cyan'})` }}
+                                                ></span>
+                                                {space.name}
+                                            </span>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
+                    </div>
+
+                    {selectedGroupId && (
+                        <div className="text-xs text-muted-foreground">
+                            Nhóm: <span className="font-semibold">{groups.find(g => g.id === selectedGroupId)?.name}</span>
+                            {selectedSpaceId && (
+                                <> • Không gian: <span className="font-semibold">{spaces.find(s => s.id === selectedSpaceId)?.name}</span></>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Search and Filter Controls */}
             <div className="bg-secondary/50 p-4 rounded-lg space-y-3">
