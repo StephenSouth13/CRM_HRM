@@ -184,6 +184,22 @@ const useBoard = (teamId: string) => {
     };
 };
 
+interface Group {
+    id: string;
+    name: string;
+    description?: string;
+    color?: string;
+    leader_id?: string;
+}
+
+interface Space {
+    id: string;
+    group_id: string;
+    name: string;
+    description?: string;
+    color?: string;
+}
+
 interface KanbanBoardProps {
     teamId: string;
     userId: string;
@@ -220,10 +236,97 @@ export const KanbanBoard = ({ teamId, userId, users }: KanbanBoardProps) => {
         getTasksInStatus
     } = useBoard(teamId);
 
+    // Group and Space states
+    const [groups, setGroups] = useState<Group[]>([]);
+    const [spaces, setSpaces] = useState<Space[]>([]);
+    const [selectedGroupId, setSelectedGroupId] = useState<string>('');
+    const [selectedSpaceId, setSelectedSpaceId] = useState<string>('');
+    const [groupsLoading, setGroupsLoading] = useState(true);
+
     // Search and filter states
     const [searchQuery, setSearchQuery] = useState('');
     const [priorityFilter, setPriorityFilter] = useState('all');
     const [assigneeFilter, setAssigneeFilter] = useState('all');
+
+    // Fetch groups and spaces
+    useEffect(() => {
+        const fetchGroupsAndSpaces = async () => {
+            try {
+                setGroupsLoading(true);
+                const { data: groupsData, error: groupsError } = await supabase
+                    .from('groups')
+                    .select('*')
+                    .eq('team_id', teamId)
+                    .eq('is_active', true)
+                    .order('position', { ascending: true });
+
+                if (groupsError) throw groupsError;
+                const fetchedGroups = (groupsData || []) as Group[];
+                setGroups(fetchedGroups);
+
+                if (fetchedGroups.length > 0 && !selectedGroupId) {
+                    const defaultGroup = fetchedGroups[0];
+                    setSelectedGroupId(defaultGroup.id);
+
+                    const { data: spacesData, error: spacesError } = await supabase
+                        .from('spaces')
+                        .select('*')
+                        .eq('group_id', defaultGroup.id)
+                        .eq('is_active', true)
+                        .order('position', { ascending: true });
+
+                    if (spacesError) throw spacesError;
+                    const fetchedSpaces = (spacesData || []) as Space[];
+                    setSpaces(fetchedSpaces);
+                    if (fetchedSpaces.length > 0) {
+                        setSelectedSpaceId(fetchedSpaces[0].id);
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching groups and spaces:', error);
+                toast({
+                    title: 'Lỗi',
+                    description: 'Không tải được nhóm và không gian',
+                    variant: 'destructive'
+                });
+            } finally {
+                setGroupsLoading(false);
+            }
+        };
+
+        if (teamId) {
+            fetchGroupsAndSpaces();
+        }
+    }, [teamId]);
+
+    // Handle group change
+    const handleGroupChange = async (groupId: string) => {
+        setSelectedGroupId(groupId);
+        setSelectedSpaceId('');
+
+        try {
+            const { data: spacesData, error } = await supabase
+                .from('spaces')
+                .select('*')
+                .eq('group_id', groupId)
+                .eq('is_active', true)
+                .order('position', { ascending: true });
+
+            if (error) throw error;
+            const fetchedSpaces = (spacesData || []) as Space[];
+            setSpaces(fetchedSpaces);
+            if (fetchedSpaces.length > 0) {
+                setSelectedSpaceId(fetchedSpaces[0].id);
+            }
+        } catch (error) {
+            console.error('Error fetching spaces:', error);
+            toast({
+                title: 'Lỗi',
+                description: 'Không tải được không gian',
+                variant: 'destructive'
+            });
+        }
+    };
 
     // Filter tasks based on search and filters
     const filteredTasks = useMemo(() => {
