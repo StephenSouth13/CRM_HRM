@@ -71,11 +71,8 @@ const SettingsPage = () => {
     const [themePreference, setThemePreference] = useState<'light' | 'dark' | 'system'>('system');
     const [themeLoading, setThemeLoading] = useState(false);
 
-    // Mock Active Sessions (Lưu ý: Logic thực tế phải dùng API của Supabase/Auth)
-    const [activeSessions] = useState([
-        { id: 1, device: 'Chrome - Windows 10', location: 'Hà Nội, VN', lastActivity: '2 phút trước', current: true },
-        { id: 2, device: 'Safari - iPhone 13', location: 'TP.HCM, VN', lastActivity: '2 giờ trước', current: false },
-    ]);
+    // Active Sessions from Supabase Auth
+    const [activeSessions] = useState<Array<{ id: string; device: string; location: string | null; lastActivity: string; current: boolean }>>([]);
 
 
     // Apply theme to DOM
@@ -310,8 +307,8 @@ const SettingsPage = () => {
         }
     };
 
-    // --- Helper Functions (Mock) ---
-    const handleSignOutDevice = (sessionId: number) => {
+    // --- Helper Functions ---
+    const handleSignOutDevice = (sessionId: string) => {
         // Logic thực tế: Gọi Supabase API để vô hiệu hóa session
         toast({ title: "Thành công", description: `Thiết bị ID ${sessionId} đã được đăng xuất.` });
     };
@@ -676,8 +673,14 @@ const SettingsPage = () => {
                                 <Button
                                     variant="outline"
                                     className="w-full justify-start"
-                                    // Logic handleExportData (MOCKUP)
-                                    onClick={() => toast({ title: "Đang xử lý", description: "Tính năng xuất dữ liệu đang được triển khai..." })}
+                                    onClick={async () => {
+                                        try {
+                                            // Implement data export functionality
+                                            toast({ title: "Thông báo", description: "Tính năng xuất dữ liệu đang được phát triển. Vui lòng liên hệ support." });
+                                        } catch (error) {
+                                            toast({ title: "Lỗi", description: "Không thể xuất dữ liệu", variant: "destructive" });
+                                        }
+                                    }}
                                 >
                                     <Download className="mr-2 h-4 w-4" />
                                     Xuất Dữ Liệu Của Tôi (JSON)

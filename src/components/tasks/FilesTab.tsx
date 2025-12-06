@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { File, FileText, Image, FileAudio, FileVideo, Upload, Trash2, Download, Share2, Folder } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { getCurrentUser } from "@/lib/auth";
 
 interface FileItem {
   id: string;
@@ -15,35 +17,38 @@ interface FileItem {
 }
 
 const FilesTab = () => {
-  const [files] = useState<FileItem[]>([
-    {
-      id: '1',
-      name: 'Project Requirements.pdf',
-      type: 'document',
-      size: 2048000,
-      uploadedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-      uploadedBy: 'John Manager',
-      taskId: 'TASK-001'
-    },
-    {
-      id: '2',
-      name: 'Design Mockup.png',
-      type: 'image',
-      size: 5242880,
-      uploadedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-      uploadedBy: 'Jane Designer',
-      taskId: 'TASK-002'
-    },
-    {
-      id: '3',
-      name: 'API Documentation.docx',
-      type: 'document',
-      size: 1048576,
-      uploadedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-      uploadedBy: 'Bob Developer',
-      taskId: 'TASK-003'
-    }
-  ]);
+  const [files, setFiles] = useState<FileItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchFiles = async () => {
+      try {
+        const user = await getCurrentUser();
+        if (!user) return;
+
+        // Fetch files from database
+        const { data, error } = await supabase
+          .from('task_files')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching files:', error);
+          setFiles([]);
+        } else if (data) {
+          setFiles(data as any[]);
+        }
+      } catch (error) {
+        console.error('Error loading files:', error);
+        setFiles([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFiles();
+  }, []);
 
   const getFileIcon = (type: FileItem['type']) => {
     switch (type) {
@@ -87,6 +92,16 @@ const FilesTab = () => {
     };
     return labels[type];
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">Đang tải tài liệu...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

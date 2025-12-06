@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from 'react';
 
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { UserRole } from '@/lib/auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -206,6 +207,7 @@ interface Space {
 interface KanbanBoardProps {
     teamId: string;
     userId: string;
+    role: UserRole;
     users: Array<{ id: string; first_name?: string; last_name?: string; avatar_url?: string | null }>;
 }
 
@@ -228,7 +230,7 @@ const priorityColors = {
     urgent: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
 };
 
-export const KanbanBoard = ({ teamId, userId, users }: KanbanBoardProps) => {
+export const KanbanBoard = ({ teamId, userId, role, users }: KanbanBoardProps) => {
     const { toast } = useToast();
     const {
         tasks,
@@ -579,6 +581,7 @@ export const KanbanBoard = ({ teamId, userId, users }: KanbanBoardProps) => {
                                 status={status}
                                 tasks={statusTasks}
                                 userId={userId}
+                                role={role}
                                 users={users}
                                 teamId={teamId}
                                 selectedGroupId={selectedGroupId}
@@ -601,6 +604,7 @@ interface KanbanColumnProps {
     status: TaskStatus;
     tasks: Task[];
     userId: string;
+    role: UserRole;
     teamId: string;
     selectedGroupId: string;
     selectedSpaceId: string;
@@ -616,6 +620,7 @@ const KanbanColumn = ({
     status,
     tasks,
     userId,
+    role,
     teamId,
     selectedGroupId,
     selectedSpaceId,
@@ -661,6 +666,10 @@ const KanbanColumn = ({
             setTaskTitle('');
             setTaskPriority('medium');
             setIsAddTaskOpen(false);
+            toast({
+                title: 'Thành công',
+                description: 'Công việc đã được tạo'
+            });
         } finally {
             setIsLoading(false);
         }
@@ -688,6 +697,7 @@ const KanbanColumn = ({
                         users={users}
                         groups={groups}
                         spaces={spaces}
+                        currentUserId={userId}
                         onUpdate={onUpdateTask}
                         onDelete={onDeleteTask}
                     />
@@ -757,11 +767,12 @@ interface TaskCardProps {
     users: Array<{ id: string; first_name?: string; last_name?: string; avatar_url?: string | null }>;
     groups: Group[];
     spaces: Space[];
+    currentUserId: string;
     onUpdate: (taskId: string, updates: Partial<Task>) => Promise<Task | undefined>;
     onDelete: (taskId: string) => Promise<void>;
 }
 
-const TaskCard = ({ task, users, groups, spaces, onUpdate, onDelete }: TaskCardProps) => {
+const TaskCard = ({ task, users, groups, spaces, currentUserId, onUpdate, onDelete }: TaskCardProps) => {
     const [isOpen, setIsOpen] = useState(false);
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
     const [formData, setFormData] = useState(task);

@@ -163,6 +163,7 @@ const Tasks = () => {
                 teamId={teamId}
                 userId={userId}
                 users={Object.values(creatorData)}
+                role={role}
               />
             )}
           </TabsContent>

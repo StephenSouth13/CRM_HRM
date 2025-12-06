@@ -69,11 +69,18 @@ const AttendanceWidget = () => {
       }
     });
 
+    const onTimeCount = Object.values(dateGroups).filter(dayRecords => {
+      const checkIn = dayRecords.find(r => r.type === 'check_in');
+      return checkIn !== undefined;
+    }).length;
+
+    const validRecords = Object.keys(dateGroups).length;
+
     setStats({
       totalHours,
-      totalDays: Object.keys(dateGroups).length,
+      totalDays: validRecords,
       averageHoursPerDay: validDays > 0 ? totalHours / validDays : 0,
-      onTimeRate: 95 // Mock for now
+      onTimeRate: (validRecords > 0 ? (onTimeCount / validRecords) * 100 : 0)
     });
   }, []); // Dependencies rỗng và không phụ thuộc vào state hay props
 
