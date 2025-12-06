@@ -767,11 +767,12 @@ interface TaskCardProps {
     users: Array<{ id: string; first_name?: string; last_name?: string; avatar_url?: string | null }>;
     groups: Group[];
     spaces: Space[];
+    currentUserId: string;
     onUpdate: (taskId: string, updates: Partial<Task>) => Promise<Task | undefined>;
     onDelete: (taskId: string) => Promise<void>;
 }
 
-const TaskCard = ({ task, users, groups, spaces, onUpdate, onDelete }: TaskCardProps) => {
+const TaskCard = ({ task, users, groups, spaces, currentUserId, onUpdate, onDelete }: TaskCardProps) => {
     const [isOpen, setIsOpen] = useState(false);
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
     const [formData, setFormData] = useState(task);
