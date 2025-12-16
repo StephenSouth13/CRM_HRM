@@ -93,24 +93,7 @@ CREATE INDEX IF NOT EXISTS idx_room_bookings_user_id ON room_bookings(user_id);
 CREATE INDEX IF NOT EXISTS idx_room_bookings_room_id ON room_bookings(room_id);
 CREATE INDEX IF NOT EXISTS idx_room_bookings_status ON room_bookings(status);
 
--- ============================================================================
--- 7. CREATE TASK FILES TABLE - For task file management
--- ============================================================================
-CREATE TABLE IF NOT EXISTS task_files (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    file_name TEXT NOT NULL,
-    file_path TEXT NOT NULL,
-    file_size INTEGER,
-    file_type VARCHAR(50),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
 
-CREATE INDEX IF NOT EXISTS idx_task_files_task_id ON task_files(task_id);
-CREATE INDEX IF NOT EXISTS idx_task_files_user_id ON task_files(user_id);
-CREATE INDEX IF NOT EXISTS idx_task_files_created_at ON task_files(created_at);
 
 -- ============================================================================
 -- 8. CREATE TASK HISTORY TABLE - Audit trail for task changes
@@ -209,11 +192,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create triggers for tables with updated_at
-DROP TRIGGER IF EXISTS update_task_files_timestamp ON task_files;
-CREATE TRIGGER update_task_files_timestamp
-    BEFORE UPDATE ON task_files
-    FOR EACH ROW
-    EXECUTE FUNCTION update_timestamp();
+
 
 DROP TRIGGER IF EXISTS update_task_columns_timestamp ON task_columns;
 CREATE TRIGGER update_task_columns_timestamp

@@ -32,9 +32,11 @@ interface Team {
     name: string;
     description: string | null;
     leader_id: string | null;
+    leader_2_id: string | null; // Thêm leader 2
     created_at: string;
     updated_at: string;
     leader_profile: LeaderProfile[] | null;
+    leader_2_profile: LeaderProfile[] | null; // Thêm profile cho leader 2
     // team_members giờ là mảng các Profiles có team_id khớp với team.id
     team_members: ProfileWithTeam[] | null; 
 }
@@ -53,6 +55,7 @@ const TeamsManagement = () => {
         name: '', 
         description: '', 
         leader_id: '',
+        leader_2_id: '', // Thêm leader 2
         member_id: 'none'
     });
     // selectedMembers giờ là các thành viên thuộc team hiện tại
@@ -61,9 +64,15 @@ const TeamsManagement = () => {
     const { toast } = useToast();
 
     const getLeaderName = (team: Team) => {
-        const profile = team.leader_profile && team.leader_profile.length > 0 ? team.leader_profile[0] : null;
-        if (profile) {
-            return `${profile.first_name} ${profile.last_name}`;
+        const leaders = [];
+        if (team.leader_profile && team.leader_profile.length > 0) {
+            leaders.push(`${team.leader_profile[0].first_name} ${team.leader_profile[0].last_name}`);
+        }
+        if (team.leader_2_profile && team.leader_2_profile.length > 0) {
+            leaders.push(`${team.leader_2_profile[0].first_name} ${team.leader_2_profile[0].last_name}`);
+        }
+        if (leaders.length > 0) {
+            return leaders.join(' & ');
         }
         if (team.leader_id) {
             return `ID: ${team.leader_id.substring(0, 8)}...`;
@@ -84,8 +93,12 @@ const TeamsManagement = () => {
                         first_name,
                         last_name,
                         email 
+                    ),
+                    leader_2_profile:profiles!leader_2_id ( 
+                        first_name,
+                        last_name,
+                        email 
                     )
-                    
                 `) 
                 .order('name');
             
@@ -220,10 +233,16 @@ const TeamsManagement = () => {
             return;
         }
 
+        if (formData.leader_id && formData.leader_id === formData.leader_2_id) {
+            toast({ title: "Lỗi", description: "Trưởng nhóm 1 và Trưởng nhóm 2 không được trùng nhau.", variant: "destructive" });
+            return;
+        }
+
         try {
             setLoading(true);
             // Chuẩn hóa leaderId: 'none' -> null
             const leaderId = formData.leader_id === "none" ? null : formData.leader_id || null;
+            const leader2Id = formData.leader_2_id === "none" ? null : formData.leader_2_id || null;
             
             const baseQuery = supabase.from('teams');
             
@@ -231,6 +250,7 @@ const TeamsManagement = () => {
                 name: formData.name,
                 description: formData.description,
                 leader_id: leaderId,
+                leader_2_id: leader2Id,
             };
 
             let error;
@@ -245,7 +265,7 @@ const TeamsManagement = () => {
             toast({ title: "Thành công", description: `Đội nhóm '${formData.name}' đã được ${isEditMode ? 'cập nhật' : 'thêm'}.` });
             
             setIsDialogOpen(false);
-            setFormData({ id: '', name: '', description: '', leader_id: '', member_id: 'none' });
+            setFormData({ id: '', name: '', description: '', leader_id: '', leader_2_id: '', member_id: 'none' });
             setIsEditMode(false);
             
             await fetchTeams();
@@ -264,6 +284,7 @@ const TeamsManagement = () => {
             name: team.name,
             description: team.description || '',
             leader_id: team.leader_id || 'none',
+            leader_2_id: team.leader_2_id || 'none',
             member_id: 'none'
         });
         // Lấy danh sách thành viên từ team.team_members đã được xử lý ở fetchTeams
@@ -273,7 +294,7 @@ const TeamsManagement = () => {
     };
     
     const initAddMode = () => {
-        setFormData({ id: '', name: '', description: '', leader_id: 'none', member_id: 'none' });
+        setFormData({ id: '', name: '', description: '', leader_id: 'none', leader_2_id: 'none', member_id: 'none' });
         setSelectedMembers([]);
         setIsEditMode(false);
         setIsDialogOpen(true);
@@ -334,8 +355,8 @@ const TeamsManagement = () => {
                                         <SelectTrigger><SelectValue placeholder="Chọn Trưởng nhóm (Tùy chọn)" /></SelectTrigger>
                                         <SelectContent>
                                             <SelectItem key="none" value="none">— Chưa chỉ định —</SelectItem>
-                                            {profiles.map(p => (
-                                                <SelectItem key={p.id} value={p.id}>
+                                            {availableLeaders.map(p => (
+                                                <SelectItem key={p.id} value={p.id} disabled={p.id === formData.leader_2_id}>
                                                     {p.first_name} {p.last_name} ({p.email})
                                                 </SelectItem>
                                             ))}

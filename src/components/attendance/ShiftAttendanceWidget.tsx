@@ -7,9 +7,18 @@ import { Clock, CheckCircle2, XCircle, TrendingUp, Calendar as CalendarIcon, Loa
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, getUserTeam } from "@/lib/auth";
 
 type ShiftType = 'morning' | 'afternoon' | 'overtime';
+
+interface ShiftConfig {
+  id: string;
+  team_id: string;
+  shift_type: ShiftType;
+  start_time: string;
+  end_time: string;
+  required: boolean;
+}
 
 interface ShiftRecord {
   id: string;
@@ -32,16 +41,19 @@ interface ShiftStats {
   absentShifts: number;
 }
 
-const SHIFT_TIMES = {
-  morning: { label: 'Buổi Sáng', start: '08:00', end: '11:30' },
-  afternoon: { label: 'Buổi Chiều', start: '13:00', end: '17:00' },
-  overtime: { label: 'Tăng Ca', start: '17:00', end: '19:00' }
-};
+interface AttendanceSettings {
+  office_latitude: number | null;
+  office_longitude: number | null;
+  check_in_radius_meters: number;
+}
 
 const ShiftAttendanceWidget = () => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [userId, setUserId] = useState<string>("");
+  const [teamId, setTeamId] = useState<string | null>(null);
+  const [shiftConfigs, setShiftConfigs] = useState<ShiftConfig[]>([]);
+  const [attendanceSettings, setAttendanceSettings] = useState<AttendanceSettings | null>(null);
   const [todayRecords, setTodayRecords] = useState<ShiftRecord[]>([]);
   const [allRecords, setAllRecords] = useState<ShiftRecord[]>([]);
   const [stats, setStats] = useState<ShiftStats>({
@@ -51,6 +63,15 @@ const ShiftAttendanceWidget = () => {
     absentShifts: 0
   });
   const [activeTab, setActiveTab] = useState<'today' | 'week' | 'month'>('today');
+
+  const getShiftLabel = (shiftType: ShiftType) => {
+    switch (shiftType) {
+      case 'morning': return 'Buổi Sáng';
+      case 'afternoon': return 'Buổi Chiều';
+      case 'overtime': return 'Tăng Ca';
+      default: return 'Unknown Shift';
+    }
+  };
 
   const calculateStats = useCallback((records: ShiftRecord[]) => {
     const monthStart = startOfMonth(new Date());
@@ -96,6 +117,51 @@ const ShiftAttendanceWidget = () => {
       absentShifts
     });
   }, []);
+
+  const loadShiftConfigs = useCallback(async (teamId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('shift_configurations')
+        .select('*')
+        .eq('team_id', teamId);
+
+      if (error) throw error;
+      const transformedData = data?.map(item => ({ ...item, start_time: item.start_time ?? '00:00:00', end_time: item.end_time ?? '00:00:00' })) || [];
+      setShiftConfigs(transformedData);
+    } catch (error) {
+      console.error("Error loading shift configurations:", error);
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: "Không thể tải cấu hình ca làm.",
+      });
+    }
+  }, [toast]);
+
+  const loadAttendanceSettings = useCallback(async (teamId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('attendance_settings')
+        .select('office_latitude, office_longitude, check_in_radius_meters')
+        .eq('team_id', teamId)
+        .single();
+
+      if (error) {
+        // It's okay if no settings are found, just means no location check
+        if (error.code !== 'PGRST116') {
+          throw error;
+        }
+      }
+      setAttendanceSettings(data as AttendanceSettings | null);
+    } catch (error) {
+      console.error("Error loading attendance settings:", error);
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: "Không thể tải cài đặt chấm công.",
+      });
+    }
+  }, [toast]);
 
   const loadAllAttendance = useCallback(async (uid: string) => {
     try {
@@ -156,12 +222,18 @@ const ShiftAttendanceWidget = () => {
       const user = await getCurrentUser();
       if (user) {
         setUserId(user.id);
+        const team = await getUserTeam(user.id);
+        if (team) {
+          setTeamId(team.id);
+          await loadShiftConfigs(team.id);
+          await loadAttendanceSettings(team.id);
+        }
         await loadTodayAttendance(user.id);
         await loadAllAttendance(user.id);
       }
     };
     initUser();
-  }, [loadTodayAttendance, loadAllAttendance]);
+  }, [loadTodayAttendance, loadAllAttendance, loadShiftConfigs, loadAttendanceSettings]);
 
   useEffect(() => {
     if (!userId) return;
@@ -205,12 +277,62 @@ const ShiftAttendanceWidget = () => {
     });
   };
 
+  const haversineDistance = (
+    lat1: number, lon1: number,
+    lat2: number, lon2: number
+  ): number => {
+    const R = 6371e3; // metres
+    const φ1 = lat1 * Math.PI / 180; // φ, λ in radians
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c; // in metres
+  };
+
   const handleShiftCheckIn = async (shiftType: ShiftType) => {
     if (!userId) return;
 
     setIsLoading(true);
     try {
-      const location = await getLocation();
+      const locationString = await getLocation();
+      if (locationString === "Location unavailable" || locationString === "Geolocation not supported") {
+        if (attendanceSettings && attendanceSettings.office_latitude && attendanceSettings.office_longitude) {
+            toast({
+                variant: "destructive",
+                title: "Chấm công thất bại",
+                description: "Không thể lấy vị trí của bạn. Vui lòng bật dịch vụ vị trí.",
+            });
+            setIsLoading(false);
+            return;
+        }
+      }
+
+      if (attendanceSettings && attendanceSettings.office_latitude && attendanceSettings.office_longitude) {
+        const [lat, lng] = locationString.split(", ").map(Number);
+        const distance = haversineDistance(
+          attendanceSettings.office_latitude,
+          attendanceSettings.office_longitude,
+          lat,
+          lng
+        );
+
+        if (distance > attendanceSettings.check_in_radius_meters) {
+          toast({
+            variant: "destructive",
+            title: "Chấm công thất bại",
+            description: `Bạn đang ở quá xa vị trí văn phòng. Khoảng cách cho phép là ${attendanceSettings.check_in_radius_meters}m.`,
+          });
+          setIsLoading(false);
+          return;
+        }
+      }
+
       const today = new Date().toISOString().split('T')[0];
       const checkInTime = new Date().toISOString();
 
@@ -232,7 +354,7 @@ const ShiftAttendanceWidget = () => {
           .from('shift_attendance')
           .update({
             check_in: checkInTime,
-            location,
+            location: locationString,
             status: 'checked_in'
           })
           .eq('id', existingRecord.id);
@@ -247,7 +369,7 @@ const ShiftAttendanceWidget = () => {
             shift_type: shiftType,
             date: today,
             check_in: checkInTime,
-            location,
+            location: locationString,
             status: 'checked_in'
           });
 
@@ -256,7 +378,7 @@ const ShiftAttendanceWidget = () => {
 
       toast({
         title: "Chấm công thành công",
-        description: `Đã chấm công ${SHIFT_TIMES[shiftType].label} lúc ${format(new Date(), 'HH:mm')}`,
+        description: `Đã chấm công ${getShiftLabel(shiftType)} lúc ${format(new Date(), 'HH:mm')}`,
       });
 
       await loadTodayAttendance(userId);
@@ -271,96 +393,127 @@ const ShiftAttendanceWidget = () => {
     }
   };
 
-  const handleShiftCheckOut = async (shiftType: ShiftType) => {
-    if (!userId) return;
-
-    setIsLoading(true);
-    try {
-      const location = await getLocation();
-      const today = new Date().toISOString().split('T')[0];
-      const checkOutTime = new Date().toISOString();
-
-      const { data: existingRecord, error: fetchError } = await supabase
-        .from('shift_attendance')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('date', today)
-        .eq('shift_type', shiftType)
-        .single();
-
-      if (fetchError && fetchError.code !== 'PGRST116') {
-        throw new Error(fetchError.message);
+  const handleShiftCheckOut = async (recordId: string) => {
+      if (!userId) return;
+  
+      setIsLoading(true);
+      try {
+          const locationString = await getLocation();
+          if (locationString === "Location unavailable" || locationString === "Geolocation not supported") {
+              if (attendanceSettings && attendanceSettings.office_latitude && attendanceSettings.office_longitude) {
+                  toast({
+                      variant: "destructive",
+                      title: "Chấm công thất bại",
+                      description: "Không thể lấy vị trí của bạn. Vui lòng bật dịch vụ vị trí.",
+                  });
+                  setIsLoading(false);
+                  return;
+              }
+          }
+  
+          if (attendanceSettings && attendanceSettings.office_latitude && attendanceSettings.office_longitude) {
+              const [lat, lng] = locationString.split(", ").map(Number);
+              const distance = haversineDistance(
+                  attendanceSettings.office_latitude,
+                  attendanceSettings.office_longitude,
+                  lat,
+                  lng
+              );
+  
+              if (distance > attendanceSettings.check_in_radius_meters) {
+                  toast({
+                      variant: "destructive",
+                      title: "Chấm công thất bại",
+                      description: `Bạn đang ở quá xa vị trí văn phòng. Khoảng cách cho phép là ${attendanceSettings.check_in_radius_meters}m.`,
+                  });
+                  setIsLoading(false);
+                  return;
+              }
+          }
+  
+          const checkOutTime = new Date().toISOString();
+  
+          const { error: updateError } = await supabase
+              .from('shift_attendance')
+              .update({
+                  check_out: checkOutTime,
+                  location_out: locationString,
+                  status: 'completed'
+              })
+              .eq('id', recordId);
+  
+          if (updateError) throw updateError;
+  
+          await loadTodayAttendance(userId);
+          toast({
+              title: "Thành công",
+              description: "Đã chấm công ra ca thành công.",
+          });
+      } catch (error) {
+          console.error("Error during check-out:", error);
+          toast({
+              variant: "destructive",
+              title: "Lỗi",
+              description: "Đã có lỗi xảy ra khi chấm công.",
+          });
+      } finally {
+          setIsLoading(false);
       }
-
-      if (existingRecord) {
-        // Update existing record with check_out
-        const { error: updateError } = await supabase
-          .from('shift_attendance')
-          .update({
-            check_out: checkOutTime,
-            location,
-            status: 'completed'
-          })
-          .eq('id', existingRecord.id);
-
-        if (updateError) throw updateError;
-      }
-
-      toast({
-        title: "Chấm công thành công",
-        description: `Đã chấm công ra ${SHIFT_TIMES[shiftType].label} lúc ${format(new Date(), 'HH:mm')}`,
-      });
-
-      await loadTodayAttendance(userId);
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Chấm công thất bại",
-        description: error instanceof Error ? error.message : "Vui lòng thử lại",
-      });
-    } finally {
-      setIsLoading(false);
-    }
   };
 
+  const renderShiftCard = (shiftConfig: ShiftConfig) => {
+    const record = todayRecords.find(r => r.shift_type === shiftConfig.shift_type);
+    const hasCheckIn = !!record?.check_in;
+    const hasCheckOut = !!record?.check_out;
 
-  const renderShiftCard = (shiftType: ShiftType) => {
-    const shiftInfo = SHIFT_TIMES[shiftType];
-    const shiftRecord = todayRecords.find(r => r.shift_type === shiftType);
-    const hasCheckIn = !!shiftRecord?.check_in;
-    const hasCheckOut = !!shiftRecord?.check_out;
-
-    let statusText = 'Chưa chấm';
-    let color = 'bg-gray-100 text-gray-700';
-
-    if (hasCheckIn && hasCheckOut) {
-      statusText = 'Hoàn thành';
-      color = 'bg-green-100 text-green-700';
-    } else if (hasCheckIn && !hasCheckOut) {
-      statusText = 'Đang làm';
-      color = 'bg-blue-100 text-blue-700';
+    let status: 'checked_in' | 'checked_out' | 'pending' | 'absent' | 'completed' = 'pending';
+    if (record?.status) {
+        status = record.status;
     }
 
-    const isCompleted = hasCheckIn && hasCheckOut;
+    const now = new Date();
+    const shiftEndTime = new Date(now.toDateString() + ' ' + shiftConfig.end_time);
+
+    if (!hasCheckIn && now > shiftEndTime) {
+        status = 'absent';
+    }
+
+    const getStatusLabel = (status: 'checked_in' | 'checked_out' | 'pending' | 'absent' | 'completed') => {
+        switch (status) {
+            case 'checked_in': return 'Đang làm';
+            case 'completed': return 'Hoàn thành';
+            case 'pending': return 'Chờ xử lý';
+            case 'absent': return 'Vắng mặt';
+            default: return 'Không xác định';
+        }
+    };
+
+    const getStatusBadgeColor = (status: 'checked_in' | 'checked_out' | 'pending' | 'absent' | 'completed') => {
+        switch (status) {
+            case 'checked_in': return "secondary";
+            case 'completed': return "success";
+            case 'pending': return "outline";
+            case 'absent': return "destructive";
+            default: return "default";
+        }
+    };
 
     return (
-      <Card key={shiftType} className="overflow-hidden hover:shadow-medium transition-shadow">
+      <Card key={shiftConfig.id} className="overflow-hidden hover:shadow-medium transition-shadow">
         <CardContent className="p-3 md:p-4 space-y-3">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
-              <h4 className="font-heading font-semibold text-base md:text-lg">{shiftInfo.label}</h4>
+              <h4 className="font-heading font-semibold text-base md:text-lg">{getShiftLabel(shiftConfig.shift_type)}</h4>
               <p className="text-xs md:text-sm text-muted-foreground">
-                {shiftInfo.start} - {shiftInfo.end}
+                {shiftConfig.start_time} - {shiftConfig.end_time}
               </p>
             </div>
-            <Badge className={`${color} border-0 text-xs flex-shrink-0`}>
-              {statusText}
-            </Badge>
+            <Badge variant={getStatusBadgeColor(status)}>{getStatusLabel(status)}</Badge>
           </div>
 
           {(hasCheckIn || hasCheckOut) && (
             <div className="text-xs md:text-sm space-y-1 bg-muted/50 rounded p-2">
-              {shiftRecord?.check_in && (
+              {record?.check_in && (
                 <p className="text-foreground">
                   <span className="font-medium">Vào:</span> {(() => {
                     const isValidDate = (dateString: string | null): boolean => {
@@ -368,16 +521,16 @@ const ShiftAttendanceWidget = () => {
                       const date = new Date(dateString);
                       return date instanceof Date && !isNaN(date.getTime());
                     };
-                    if (!isValidDate(shiftRecord.check_in)) return '---';
+                    if (!isValidDate(record.check_in)) return '---';
                     try {
-                      return format(new Date(shiftRecord.check_in), 'HH:mm');
+                      return format(new Date(record.check_in), 'HH:mm');
                     } catch {
                       return '---';
                     }
                   })()}
                 </p>
               )}
-              {shiftRecord?.check_out && (
+              {record?.check_out && (
                 <p className="text-foreground">
                   <span className="font-medium">Ra:</span> {(() => {
                     const isValidDate = (dateString: string | null): boolean => {
@@ -385,9 +538,9 @@ const ShiftAttendanceWidget = () => {
                       const date = new Date(dateString);
                       return date instanceof Date && !isNaN(date.getTime());
                     };
-                    if (!isValidDate(shiftRecord.check_out)) return '---';
+                    if (!isValidDate(record.check_out)) return '---';
                     try {
-                      return format(new Date(shiftRecord.check_out), 'HH:mm');
+                      return format(new Date(record.check_out), 'HH:mm');
                     } catch {
                       return '---';
                     }
@@ -402,7 +555,7 @@ const ShiftAttendanceWidget = () => {
               size="sm"
               className="flex-1 text-xs md:text-sm h-9 md:h-10"
               disabled={hasCheckIn || isLoading}
-              onClick={() => handleShiftCheckIn(shiftType)}
+              onClick={() => handleShiftCheckIn(shiftConfig.shift_type)}
             >
               {isLoading ? <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" /> : <CheckCircle2 className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />}
               Vào
@@ -412,7 +565,7 @@ const ShiftAttendanceWidget = () => {
               variant="outline"
               className="flex-1 text-xs md:text-sm h-9 md:h-10"
               disabled={!hasCheckIn || hasCheckOut || isLoading}
-              onClick={() => handleShiftCheckOut(shiftType)}
+              onClick={() => handleShiftCheckOut(record!.id)}
             >
               {isLoading ? <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" /> : <XCircle className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />}
               Ra
@@ -445,7 +598,11 @@ const ShiftAttendanceWidget = () => {
           Chấm công hôm nay
         </h3>
         <div className="grid gap-4 md:grid-cols-3">
-          {(Object.keys(SHIFT_TIMES) as ShiftType[]).map(shiftType => renderShiftCard(shiftType))}
+          {shiftConfigs.length > 0 ? (
+            shiftConfigs.map(shiftConfig => renderShiftCard(shiftConfig))
+          ) : (
+            <p>Không có ca làm nào được cấu hình cho đội của bạn.</p>
+          )}
         </div>
       </div>
 
@@ -528,7 +685,6 @@ const ShiftAttendanceWidget = () => {
                     }
                   };
 
-                  const shiftInfo = SHIFT_TIMES[record.shift_type];
                   const statusColor =
                     record.status === 'completed' ? 'bg-green-100 text-green-700' :
                     record.status === 'checked_in' ? 'bg-blue-100 text-blue-700' :
@@ -544,7 +700,7 @@ const ShiftAttendanceWidget = () => {
                     <div key={record.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <p className="font-medium">{shiftInfo.label}</p>
+                          <p className="font-medium">{getShiftLabel(record.shift_type)}</p>
                           <Badge variant="outline" className="text-xs">
                             {formatDate(record.date, 'MMM dd')}
                           </Badge>

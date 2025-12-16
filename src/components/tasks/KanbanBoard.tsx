@@ -24,9 +24,16 @@ import {
     DialogTrigger,
     DialogFooter,
 } from '@/components/ui/dialog';
-import { Plus, Trash2, Edit2, Loader2, AlertCircle, Search, X } from 'lucide-react';
+import { Plus, Trash2, Edit2, Loader2, AlertCircle, Search, X, MoreVertical } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 
 // Task interface matching the Supabase schema
 interface Task {
@@ -38,155 +45,23 @@ interface Task {
     assignee_id: string | null;
     creator_id: string;
     team_id: string | null;
-    status: 'todo' | 'in_progress' | 'review' | 'done';
+    status: string;
     group_id: string | null;
     space_id: string | null;
     field_id: string | null;
     created_at: string;
     updated_at: string;
     completed_at: string | null;
+    column_id: string;
 }
 
-// Task status with display information
-interface TaskStatus {
-    value: 'todo' | 'in_progress' | 'review' | 'done';
-    label: string;
+interface KanbanColumnData {
+    id: string;
+    name: string;
+    team_id: string;
+    position: number;
     color: string;
 }
-
-const TASK_STATUSES: TaskStatus[] = [
-    { value: 'todo', label: 'To Do', color: 'blue' },
-    { value: 'in_progress', label: 'In Progress', color: 'yellow' },
-    { value: 'review', label: 'Review', color: 'purple' },
-    { value: 'done', label: 'Done', color: 'green' }
-];
-
-// --- useBoard HOOK LOGIC ---
-const useBoard = (teamId: string) => {
-    const { toast } = useToast();
-    const [tasks, setTasks] = useState<Task[]>([]);
-    const [loading, setLoading] = useState(false);
-
-    // Fetch tasks
-    const fetchTasks = useCallback(async () => {
-        if (!teamId) return;
-
-        try {
-            setLoading(true);
-            const { data, error } = await supabase
-                .from('tasks')
-                .select('*')
-                .eq('team_id', teamId)
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
-            setTasks(data || []);
-        } catch (error) {
-            console.error('Error fetching tasks:', error);
-            toast({
-                title: 'Lỗi',
-                description: 'Không tải được công việc',
-                variant: 'destructive'
-            });
-        } finally {
-            setLoading(false);
-        }
-    }, [teamId, toast]);
-
-    // Create task
-    const createTask = useCallback(async (taskData: Omit<Task, 'id' | 'created_at' | 'updated_at' | 'completed_at'>) => {
-        try {
-            const { data, error } = await supabase
-                .from('tasks')
-                .insert([taskData])
-                .select()
-                .single();
-
-            if (error) throw error;
-            const createdTask = data as Task;
-            setTasks(prev => [createdTask, ...prev]);
-            toast({ title: 'Thành công', description: 'Công việc đã được tạo' });
-            return createdTask;
-        } catch (error) {
-            console.error('Error creating task:', error);
-            toast({ title: 'Lỗi', description: 'Không tạo được công việc', variant: 'destructive' });
-        }
-    }, [toast]);
-
-    // Update task
-    const updateTask = useCallback(async (taskId: string, updates: Partial<Task>) => {
-        try {
-            const { data, error } = await supabase
-                .from('tasks')
-                .update(updates)
-                .eq('id', taskId)
-                .select()
-                .single();
-
-            if (error) throw error;
-            const updatedTask = data as Task;
-            setTasks(prev => prev.map(t => t.id === taskId ? updatedTask : t));
-            return updatedTask;
-        } catch (error) {
-            console.error('Error updating task:', error);
-            toast({ title: 'Lỗi', description: 'Không cập nhật được công việc', variant: 'destructive' });
-        }
-    }, [toast]);
-
-    // Delete task
-    const deleteTask = useCallback(async (taskId: string) => {
-        try {
-            const { error } = await supabase
-                .from('tasks')
-                .delete()
-                .eq('id', taskId);
-
-            if (error) throw error;
-            setTasks(prev => prev.filter(t => t.id !== taskId));
-            toast({ title: 'Thành công', description: 'Công việc đã bị xóa' });
-        } catch (error) {
-            console.error('Error deleting task:', error);
-            toast({ title: 'Lỗi', description: 'Không xóa được công việc', variant: 'destructive' });
-        }
-    }, [toast]);
-
-    // Get tasks for a specific status
-    const getTasksInStatus = useCallback((status: 'todo' | 'in_progress' | 'review' | 'done') => {
-        return tasks.filter(t => t.status === status);
-    }, [tasks]);
-
-    // Initial load and Real-time subscription
-    useEffect(() => {
-        if (teamId) {
-            fetchTasks();
-        }
-    }, [teamId, fetchTasks]);
-
-    useEffect(() => {
-        if (!teamId) return;
-
-        // Subscriptions
-        const tasksChannel = supabase
-            .channel(`tasks-${teamId}`)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: `team_id=eq.${teamId}` }, () => {
-                fetchTasks();
-            })
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(tasksChannel);
-        };
-    }, [teamId, fetchTasks]);
-
-    return {
-        tasks,
-        loading,
-        createTask,
-        updateTask,
-        deleteTask,
-        getTasksInStatus,
-    };
-};
 
 interface Group {
     id: string;
@@ -232,161 +107,181 @@ const priorityColors = {
 
 export const KanbanBoard = ({ teamId, userId, role, users }: KanbanBoardProps) => {
     const { toast } = useToast();
-    const {
-        tasks,
-        loading,
-        createTask,
-        updateTask,
-        deleteTask,
-        getTasksInStatus
-    } = useBoard(teamId);
-
-    // Group and Space states
-    const [groups, setGroups] = useState<Group[]>([]);
-    const [spaces, setSpaces] = useState<Space[]>([]);
-    const [selectedGroupId, setSelectedGroupId] = useState<string>('');
-    const [selectedSpaceId, setSelectedSpaceId] = useState<string>('');
-    const [groupsLoading, setGroupsLoading] = useState(true);
-
-    // Search and filter states
-    const [searchQuery, setSearchQuery] = useState('');
-    const [priorityFilter, setPriorityFilter] = useState('all');
+    const [tasks, setTasks] = useState<Task[]>([]);
+    const [columns, setColumns] = useState<KanbanColumnData[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+    const [editingTask, setEditingTask] = useState<Task | null>(null);
+    const [currentColumn, setCurrentColumn] = useState<KanbanColumnData | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
     const [assigneeFilter, setAssigneeFilter] = useState('all');
+    const [selectedGroupId, setSelectedGroupId] = useState('');
+    const [selectedSpaceId, setSelectedSpaceId] = useState('');
+    const [isColumnDialogOpen, setIsColumnDialogOpen] = useState(false);
+    const [editingColumn, setEditingColumn] = useState<KanbanColumnData | null>(null);
 
-    // Fetch groups and spaces
-    useEffect(() => {
-        const fetchGroupsAndSpaces = async () => {
-            try {
-                setGroupsLoading(true);
-                const { data: groupsData, error: groupsError } = await supabase
-                    .from('groups')
-                    .select('*')
-                    .eq('team_id', teamId)
-                    .eq('is_active', true)
-                    .order('position', { ascending: true });
+    const fetchTasksAndColumns = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const [columnsRes, tasksRes] = await Promise.all([
+                supabase.from('task_columns').select('*').eq('team_id', teamId).order('position', { ascending: true }),
+                supabase.from('tasks').select('*').eq('team_id', teamId)
+            ]);
 
-                if (groupsError) {
-                    console.error('Groups fetch error:', groupsError.message, groupsError);
-                    throw new Error(`Failed to fetch groups: ${groupsError.message}`);
-                }
+            if (columnsRes.error) throw columnsRes.error;
+            if (tasksRes.error) throw tasksRes.error;
 
-                const fetchedGroups = (groupsData || []) as Group[];
-                setGroups(fetchedGroups);
+            setColumns(columnsRes.data || []);
+            setTasks(tasksRes.data || []);
 
-                if (fetchedGroups.length > 0 && !selectedGroupId) {
-                    const defaultGroup = fetchedGroups[0];
-                    setSelectedGroupId(defaultGroup.id);
-
-                    const { data: spacesData, error: spacesError } = await supabase
-                        .from('spaces')
-                        .select('*')
-                        .eq('group_id', defaultGroup.id)
-                        .eq('is_active', true)
-                        .order('position', { ascending: true });
-
-                    if (spacesError) {
-                        console.error('Spaces fetch error:', spacesError.message, spacesError);
-                        throw new Error(`Failed to fetch spaces: ${spacesError.message}`);
-                    }
-
-                    const fetchedSpaces = (spacesData || []) as Space[];
-                    setSpaces(fetchedSpaces);
-                    if (fetchedSpaces.length > 0) {
-                        setSelectedSpaceId(fetchedSpaces[0].id);
-                    }
-                } else if (fetchedGroups.length === 0) {
-                    console.warn('No groups found for team:', teamId);
-                }
-            } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : String(error);
-                console.error('Error fetching groups and spaces:', errorMessage);
-                toast({
-                    title: 'Lỗi',
-                    description: errorMessage || 'Không tải được nhóm và không gian',
-                    variant: 'destructive'
-                });
-                setGroups([]);
-                setSpaces([]);
-            } finally {
-                setGroupsLoading(false);
-            }
-        };
-
-        if (teamId) {
-            fetchGroupsAndSpaces();
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            toast({ title: 'Lỗi', description: `Không thể tải dữ liệu: ${errorMessage}`, variant: 'destructive' });
+        } finally {
+            setIsLoading(false);
         }
     }, [teamId, toast]);
 
-    // Handle group change
-    const handleGroupChange = async (groupId: string) => {
-        setSelectedGroupId(groupId);
-        setSelectedSpaceId('');
+    useEffect(() => {
+        fetchTasksAndColumns();
+    }, [fetchTasksAndColumns]);
 
+    const createColumn = async (column: Omit<KanbanColumnData, 'id' | 'position'>) => {
         try {
-            const { data: spacesData, error } = await supabase
-                .from('spaces')
-                .select('*')
-                .eq('group_id', groupId)
-                .eq('is_active', true)
-                .order('position', { ascending: true });
-
-            if (error) {
-                console.error('Spaces fetch error:', error.message, error);
-                throw new Error(`Failed to fetch spaces: ${error.message}`);
-            }
-
-            const fetchedSpaces = (spacesData || []) as Space[];
-            setSpaces(fetchedSpaces);
-            if (fetchedSpaces.length > 0) {
-                setSelectedSpaceId(fetchedSpaces[0].id);
+            const { data, error } = await supabase
+                .from('task_columns')
+                .insert([{ ...column, position: columns.length, team_id: teamId }])
+                .select();
+            if (error) throw error;
+            if (data) {
+                setColumns([...columns, data[0]]);
+                toast({ title: 'Thành công', description: 'Đã tạo cột mới.' });
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error('Error fetching spaces:', errorMessage);
-            toast({
-                title: 'Lỗi',
-                description: errorMessage || 'Không tải được không gian',
-                variant: 'destructive'
-            });
-            setSpaces([]);
+            toast({ title: 'Lỗi', description: `Không thể tạo cột: ${errorMessage}`, variant: 'destructive' });
         }
     };
 
-    // Filter tasks based on search, group, space, and other filters
-    const filteredTasks = useMemo(() => {
-        return tasks.filter(task => {
-            const matchesSearch = searchQuery === '' ||
-                task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                (task.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
-
-            const matchesGroup = !selectedGroupId || task.group_id === selectedGroupId;
-            const matchesSpace = !selectedSpaceId || task.space_id === selectedSpaceId;
-            const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter;
-            const matchesAssignee = assigneeFilter === 'all' || task.assignee_id === assigneeFilter;
-
-            return matchesSearch && matchesGroup && matchesSpace && matchesPriority && matchesAssignee;
-        });
-    }, [tasks, searchQuery, selectedGroupId, selectedSpaceId, priorityFilter, assigneeFilter]);
-
-    const uniquePriorities = useMemo(() =>
-        ['all', ...new Set(tasks.map(t => t.priority))],
-        [tasks]
-    );
-
-    const uniqueAssignees = useMemo(() =>
-        [...new Set(tasks.filter(t => t.assignee_id).map(t => t.assignee_id))],
-        [tasks]
-    );
-
-    const clearFilters = () => {
-        setSearchQuery('');
-        setPriorityFilter('all');
-        setAssigneeFilter('all');
+    const updateColumn = async (column: KanbanColumnData) => {
+        try {
+            const { data, error } = await supabase
+                .from('task_columns')
+                .update(column)
+                .eq('id', column.id)
+                .select();
+            if (error) throw error;
+            if (data) {
+                setColumns(columns.map(c => c.id === column.id ? data[0] : c));
+                toast({ title: 'Thành công', description: 'Đã cập nhật cột.' });
+            }
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            toast({ title: 'Lỗi', description: `Không thể cập nhật cột: ${errorMessage}`, variant: 'destructive' });
+        }
     };
 
-    const hasActiveFilters = searchQuery || priorityFilter !== 'all' || assigneeFilter !== 'all';
+    const deleteColumn = async (columnId: string) => {
+        try {
+            // Check if there are tasks in the column
+            const { data: tasksInColumn, error: tasksError } = await supabase
+                .from('tasks')
+                .select('id')
+                .eq('column_id', columnId)
+                .limit(1);
 
-    if (loading) {
+            if (tasksError) throw tasksError;
+
+            if (tasksInColumn && tasksInColumn.length > 0) {
+                toast({
+                    title: 'Không thể xóa',
+                    description: 'Không thể xóa cột khi vẫn còn công việc trong đó.',
+                    variant: 'destructive',
+                });
+                return;
+            }
+
+            const { error } = await supabase.from('task_columns').delete().eq('id', columnId);
+            if (error) throw error;
+            setColumns(columns.filter(c => c.id !== columnId));
+            toast({ title: 'Thành công', description: 'Đã xóa cột.' });
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            toast({ title: 'Lỗi', description: `Không thể xóa cột: ${errorMessage}`, variant: 'destructive' });
+        }
+    };
+
+
+    const createTask = useCallback(async (taskData: Omit<Task, 'id' | 'created_at' | 'updated_at' | 'completed_at'>) => {
+        try {
+            const { data, error } = await supabase
+                .from('tasks')
+                .insert([taskData])
+                .select()
+                .single();
+
+            if (error) throw error;
+            const createdTask = data as Task;
+            setTasks(prev => [createdTask, ...prev]);
+            toast({ title: 'Thành công', description: 'Công việc đã được tạo' });
+            return createdTask;
+        } catch (error) {
+            console.error('Error creating task:', error);
+            toast({ title: 'Lỗi', description: 'Không tạo được công việc', variant: 'destructive' });
+        }
+    }, [toast]);
+
+    const updateTask = useCallback(async (taskId: string, updates: Partial<Task>) => {
+        try {
+            const { data, error } = await supabase
+                .from('tasks')
+                .update(updates)
+                .eq('id', taskId)
+                .select()
+                .single();
+
+            if (error) throw error;
+            const updatedTask = data as Task;
+            setTasks(prev => prev.map(t => t.id === taskId ? updatedTask : t));
+            return updatedTask;
+        } catch (error) {
+            console.error('Error updating task:', error);
+            toast({ title: 'Lỗi', description: 'Không cập nhật được công việc', variant: 'destructive' });
+        }
+    }, [toast]);
+
+    const deleteTask = useCallback(async (taskId: string) => {
+        try {
+            const { error } = await supabase
+                .from('tasks')
+                .delete()
+                .eq('id', taskId);
+
+            if (error) throw error;
+            setTasks(prev => prev.filter(t => t.id !== taskId));
+            toast({ title: 'Thành công', description: 'Công việc đã bị xóa' });
+        } catch (error) {
+            console.error('Error deleting task:', error);
+            toast({ title: 'Lỗi', description: 'Không xóa được công việc', variant: 'destructive' });
+        }
+    }, [toast]);
+
+    const handleOpenColumnDialog = (column: KanbanColumnData | null) => {
+        setEditingColumn(column);
+        setIsColumnDialogOpen(true);
+    };
+
+    const handleSaveColumn = (columnData: { name: string; color: string }) => {
+        if (editingColumn) {
+            updateColumn({ ...editingColumn, ...columnData });
+        } else {
+            createColumn(columnData);
+        }
+        setIsColumnDialogOpen(false);
+        setEditingColumn(null);
+    };
+
+    if (isLoading) {
         return (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {Array.from({ length: 4 }).map((_, i) => (
@@ -407,201 +302,61 @@ export const KanbanBoard = ({ teamId, userId, role, users }: KanbanBoardProps) =
 
     return (
         <div className="space-y-4">
-            {/* Group and Space Selection Controls - Only show if groups exist */}
-            {groups.length > 0 && (
-                <div className="bg-primary/5 p-4 rounded-lg border border-primary/10 space-y-3">
-                    <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-                        <h3 className="text-sm font-semibold text-muted-foreground">Chọn Nhóm & Không Gian</h3>
-                        {(selectedGroupId || selectedSpaceId) && (
-                            <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                                if (groups.length > 0) {
-                                    setSelectedGroupId(groups[0].id);
-                                }
-                                setSelectedSpaceId('');
-                            }}
-                            className="text-xs"
-                        >
-                                <X className="h-3 w-3 mr-1" />
-                                Đặt lại
-                            </Button>
-                        )}
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {/* Group Selector */}
-                        {groups.length > 0 && (
-                            <Select value={selectedGroupId || ''} onValueChange={handleGroupChange}>
-                                <SelectTrigger className="bg-white dark:bg-gray-700">
-                                    <SelectValue placeholder="Chọn Nhóm..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {groups.map(group => (
-                                        <SelectItem key={group.id} value={group.id}>
-                                            <span className="flex items-center gap-2">
-                                                <span
-                                                    className="w-2 h-2 rounded-full"
-                                                    style={{ backgroundColor: `var(--color-${group.color || 'blue'})` }}
-                                                ></span>
-                                                {group.name}
-                                            </span>
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        )}
-
-                        {/* Space Selector */}
-                        {spaces.length > 0 && (
-                            <Select value={selectedSpaceId || '__all__'} onValueChange={(value) => setSelectedSpaceId(value === '__all__' ? '' : value)}>
-                                <SelectTrigger className="bg-white dark:bg-gray-700">
-                                    <SelectValue placeholder="Chọn Không Gian..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="__all__">Tất cả Không Gian</SelectItem>
-                                    {spaces.map(space => (
-                                        <SelectItem key={space.id} value={space.id}>
-                                            <span className="flex items-center gap-2">
-                                                <span
-                                                    className="w-2 h-2 rounded-full"
-                                                    style={{ backgroundColor: `var(--color-${space.color || 'cyan'})` }}
-                                                ></span>
-                                                {space.name}
-                                            </span>
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        )}
-                    </div>
-
-                    {selectedGroupId && (
-                        <div className="text-xs text-muted-foreground">
-                            Nhóm: <span className="font-semibold">{groups.find(g => g.id === selectedGroupId)?.name}</span>
-                            {selectedSpaceId && (
-                                <> • Không gian: <span className="font-semibold">{spaces.find(s => s.id === selectedSpaceId)?.name}</span></>
-                            )}
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* Search and Filter Controls */}
-            <div className="bg-secondary/50 p-4 rounded-lg space-y-3">
-                <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold">Tìm kiếm & Lọc</h3>
-                    {hasActiveFilters && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={clearFilters}
-                            className="text-xs"
-                        >
-                            <X className="h-4 w-4 mr-1" />
-                            Xóa lọc
-                        </Button>
-                    )}
-                </div>
-
-                {/* Search Input */}
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        placeholder="Tìm kiếm công việc theo tiêu đề hoặc mô tả..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10 bg-white dark:bg-gray-700"
-                    />
-                </div>
-
-                {/* Filters Row */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {/* Priority Filter */}
-                    <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                        <SelectTrigger className="bg-white dark:bg-gray-700">
-                            <SelectValue placeholder="Lọc theo ưu tiên" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Tất cả ưu tiên</SelectItem>
-                            {uniquePriorities.map(priority => (
-                                priority !== 'all' && (
-                                    <SelectItem key={priority} value={priority}>
-                                        {priority.charAt(0).toUpperCase() + priority.slice(1)}
-                                    </SelectItem>
-                                )
-                            ))}
-                        </SelectContent>
-                    </Select>
-
-                    {/* Assignee Filter */}
-                    <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
-                        <SelectTrigger className="bg-white dark:bg-gray-700">
-                            <SelectValue placeholder="Lọc theo người được giao" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Tất cả người được giao</SelectItem>
-                            {uniqueAssignees.map(assigneeId => (
-                                <SelectItem key={assigneeId} value={assigneeId}>
-                                    ID: {assigneeId.substring(0, 8)}...
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                {/* Results Info */}
-                <div className="text-xs text-muted-foreground">
-                    {filteredTasks.length === tasks.length
-                        ? `Tổng cộng ${tasks.length} công việc`
-                        : `Hiển thị ${filteredTasks.length} / ${tasks.length} công việc`}
-                </div>
-            </div>
-
-            {/* Header */}
             <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold">Bảng Kanban</h2>
+                <Button onClick={() => handleOpenColumnDialog(null)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Thêm Cột
+                </Button>
             </div>
 
-            {tasks.length === 0 ? (
+            {columns.length === 0 ? (
                 <Card className="bg-muted/50 dark:bg-gray-800">
                     <CardContent className="flex flex-col items-center justify-center py-12">
                         <AlertCircle className="h-8 w-8 text-muted-foreground mb-2" />
-                        <p className="text-muted-foreground">Chưa có công việc nào. Hãy tạo một công việc để bắt đầu!</p>
+                        <p className="text-muted-foreground">Chưa có cột nào. Hãy tạo một cột để bắt đầu!</p>
                     </CardContent>
                 </Card>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 auto-rows-max overflow-x-auto min-h-[500px]">
-                    {TASK_STATUSES.map(status => {
-                        const statusTasks = filteredTasks.filter(t => t.status === status.value);
+                    {columns.map(column => {
+                        const columnTasks = tasks.filter(t => t.column_id === column.id);
                         return (
                             <KanbanColumn
-                                key={status.value}
-                                status={status}
-                                tasks={statusTasks}
+                                key={column.id}
+                                column={column}
+                                tasks={columnTasks}
                                 userId={userId}
                                 role={role}
                                 users={users}
                                 teamId={teamId}
                                 selectedGroupId={selectedGroupId}
                                 selectedSpaceId={selectedSpaceId}
-                                groups={groups}
-                                spaces={spaces}
+                                groups={[]}
+                                spaces={[]}
                                 onCreateTask={createTask}
                                 onUpdateTask={updateTask}
                                 onDeleteTask={deleteTask}
+                                onEditColumn={() => handleOpenColumnDialog(column)}
+                                onDeleteColumn={() => deleteColumn(column.id)}
                             />
                         );
                     })}
                 </div>
             )}
+            <ColumnDialog
+                isOpen={isColumnDialogOpen}
+                onClose={() => setIsColumnDialogOpen(false)}
+                onSave={handleSaveColumn}
+                column={editingColumn}
+            />
         </div>
     );
 };
 
+
 interface KanbanColumnProps {
-    status: TaskStatus;
+    column: KanbanColumnData;
     tasks: Task[];
     userId: string;
     role: UserRole;
@@ -614,10 +369,12 @@ interface KanbanColumnProps {
     onCreateTask: (task: Omit<Task, 'id' | 'created_at' | 'updated_at' | 'completed_at'>) => Promise<Task | undefined>;
     onUpdateTask: (taskId: string, updates: Partial<Task>) => Promise<Task | undefined>;
     onDeleteTask: (taskId: string) => Promise<void>;
+    onEditColumn: () => void;
+    onDeleteColumn: () => void;
 }
 
 const KanbanColumn = ({
-    status,
+    column,
     tasks,
     userId,
     role,
@@ -630,6 +387,8 @@ const KanbanColumn = ({
     onCreateTask,
     onUpdateTask,
     onDeleteTask,
+    onEditColumn,
+    onDeleteColumn,
 }: KanbanColumnProps) => {
     const { toast } = useToast();
     const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
@@ -661,7 +420,8 @@ const KanbanColumn = ({
                 group_id: selectedGroupId || null,
                 space_id: selectedSpaceId || null,
                 field_id: null,
-                status: status.value
+                status: column.name,
+                column_id: column.id
             });
             setTaskTitle('');
             setTaskPriority('medium');
@@ -675,18 +435,35 @@ const KanbanColumn = ({
         }
     };
 
-    const colorClass = colorBgClasses[status.color as keyof typeof colorBgClasses];
+    const colorClass = colorBgClasses[column.color as keyof typeof colorBgClasses] || colorBgClasses.gray;
 
     return (
         <Card className={`${colorClass} w-full min-w-[280px] max-w-full h-fit shadow-lg dark:shadow-xl`}>
             <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                     <CardTitle className="text-sm font-semibold uppercase tracking-wider dark:text-gray-200">
-                        {status.label}
+                        {column.name}
                         <Badge variant="secondary" className="ml-2 text-xs dark:bg-gray-700 dark:text-gray-300">
                             {tasks.length}
                         </Badge>
                     </CardTitle>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                <MoreVertical className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={onEditColumn}>
+                                <Edit2 className="mr-2 h-4 w-4" />
+                                Sửa Cột
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={onDeleteColumn} className="text-red-600">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Xóa Cột
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -718,7 +495,7 @@ const KanbanColumn = ({
                     </DialogTrigger>
                     <DialogContent>
                         <DialogHeader>
-                            <DialogTitle>Thêm Công Việc vào "{status.label}"</DialogTitle>
+                            <DialogTitle>Thêm Công Việc vào "{column.name}"</DialogTitle>
                         </DialogHeader>
                         <form onSubmit={handleAddTask} className="space-y-4">
                             <div>
@@ -813,7 +590,6 @@ const TaskCard = ({ task, users, groups, spaces, currentUserId, onUpdate, onDele
                 <CardContent className="p-3 space-y-2">
                     <h4 className="text-sm font-medium line-clamp-2 dark:text-white">{task.title}</h4>
 
-                    {/* Space and Group Info */}
                     {(space || group) && (
                         <div className="flex flex-wrap gap-1">
                             {space && (
@@ -892,20 +668,6 @@ const TaskCard = ({ task, users, groups, spaces, currentUserId, onUpdate, onDele
                             </Select>
                         </div>
                         <div>
-                            <Label htmlFor="edit-status">Trạng thái</Label>
-                            <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v as 'todo' | 'in_progress' | 'review' | 'done' })}>
-                                <SelectTrigger id="edit-status">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="todo">To Do</SelectItem>
-                                    <SelectItem value="in_progress">In Progress</SelectItem>
-                                    <SelectItem value="review">Review</SelectItem>
-                                    <SelectItem value="done">Done</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div>
                             <Label htmlFor="edit-assignee">Người được giao</Label>
                             <Select value={formData.assignee_id || ''} onValueChange={(v) => setFormData({ ...formData, assignee_id: v || null })}>
                                 <SelectTrigger id="edit-assignee">
@@ -930,40 +692,6 @@ const TaskCard = ({ task, users, groups, spaces, currentUserId, onUpdate, onDele
                                 disabled={isLoading}
                             />
                         </div>
-                        <div>
-                            <Label htmlFor="edit-group">Nhóm</Label>
-                            <Select value={formData.group_id || '__none__'} onValueChange={(v) => setFormData({ ...formData, group_id: v === '__none__' ? null : v, space_id: null })}>
-                                <SelectTrigger id="edit-group">
-                                    <SelectValue placeholder="Chọn Nhóm" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="__none__">Không có nhóm</SelectItem>
-                                    {groups.map(group => (
-                                        <SelectItem key={group.id} value={group.id}>
-                                            {group.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        {formData.group_id && spaces.filter(s => s.group_id === formData.group_id).length > 0 && (
-                            <div>
-                                <Label htmlFor="edit-space">Không Gian</Label>
-                                <Select value={formData.space_id || '__none__'} onValueChange={(v) => setFormData({ ...formData, space_id: v === '__none__' ? null : v })}>
-                                    <SelectTrigger id="edit-space">
-                                        <SelectValue placeholder="Chọn Không Gian" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="__none__">Không có không gian</SelectItem>
-                                        {spaces.filter(s => s.group_id === formData.group_id).map(space => (
-                                            <SelectItem key={space.id} value={space.id}>
-                                                {space.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        )}
                     </div>
                     <DialogFooter className="flex justify-between pt-4">
                         <DialogTrigger asChild>
@@ -1004,5 +732,80 @@ const TaskCard = ({ task, users, groups, spaces, currentUserId, onUpdate, onDele
                 </DialogContent>
             </Dialog>
         </>
+    );
+};
+
+interface ColumnDialogProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onSave: (columnData: { name: string; color: string }) => void;
+    column: KanbanColumnData | null;
+}
+
+const ColumnDialog = ({ isOpen, onClose, onSave, column }: ColumnDialogProps) => {
+    const [name, setName] = useState('');
+    const [color, setColor] = useState('gray');
+
+    useEffect(() => {
+        if (column) {
+            setName(column.name);
+            setColor(column.color);
+        } else {
+            setName('');
+            setColor('gray');
+        }
+    }, [column]);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!name.trim()) {
+            // Basic validation
+            return;
+        }
+        onSave({ name, color });
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onClose}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{column ? 'Sửa Cột' : 'Tạo Cột Mới'}</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <Label htmlFor="column-name">Tên Cột</Label>
+                        <Input
+                            id="column-name"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            placeholder="Ví dụ: Cần làm"
+                            required
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="column-color">Màu Sắc</Label>
+                        <Select value={color} onValueChange={setColor}>
+                            <SelectTrigger id="column-color">
+                                <SelectValue placeholder="Chọn màu" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {Object.entries(colorBgClasses).map(([colorKey, className]) => (
+                                    <SelectItem key={colorKey} value={colorKey}>
+                                        <div className="flex items-center">
+                                            <span className={`w-4 h-4 rounded-full mr-2 ${colorBgClasses[colorKey as keyof typeof colorBgClasses].split(' ')[0]}`}></span>
+                                            {colorKey.charAt(0).toUpperCase() + colorKey.slice(1)}
+                                        </div>
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={onClose}>Hủy</Button>
+                        <Button type="submit">Lưu</Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
     );
 };
