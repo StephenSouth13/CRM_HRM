@@ -386,3 +386,5 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 [🐛 Report Bug](https://github.com/yourusername/vine-crm/issues) • [✨ Request Feature](https://github.com/yourusername/vine-crm/issues)
 
 </div>
+
+- Tị supabase để lưu trữ dữ liệu:https://supabase.com/dashboard/project/gnxadfydbnigwboojhgw
